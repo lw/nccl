@@ -96,10 +96,7 @@ struct ncclComm {
   int buffSizes[NCCL_NUM_PROTOCOLS];
 
   // Algorithm/Protocols thresholds
-  ssize_t threadThresholds[NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
-  float latencies[0][NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
-  float bandwidths[0][NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
-  int maxThreads[NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
+  int maxThreads;
 
   // Whether there has been a fatal error in this communicator.
   ncclResult_t fatalError;
@@ -132,8 +129,6 @@ struct ncclComm {
   pthread_t proxyThread;
   struct ncclProxyState proxyState;
 
-  // Whether this communicator uses collNet
-  int collNetSupport;
   //list of async p2p operation queued in a group semantics
   struct ncclP2Plist p2plist;
 };

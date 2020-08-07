@@ -372,7 +372,6 @@ ncclResult_t ncclTopoSearchRecNet(struct ncclTopoSystem* system, struct ncclTopo
   for (int n=0; n<system->nodes[NET].count; n++) {
     struct ncclTopoNode* net = system->nodes[NET].nodes+n;
     struct ncclTopoNode* gpu;
-    if (graph->collNet && net->net.collSupport == 0) continue;
     if (net->net.width < speed) continue;
     if (net->net.maxChannels == 0) continue;
 
@@ -761,7 +760,7 @@ done:
     memcpy(&tmpGraph, graph, sizeof(tmpGraph));
   }
 
-  if (graph->nChannels == 0 && graph->collNet == 0) {
+  if (graph->nChannels == 0) {
     WARN("Could not find a path for pattern %d, falling back to simple order\n", graph->pattern);
     for (int i=0; i<ngpus; i++) graph->intra[i] = system->nodes[GPU].nodes[i].gpu.rank;
     graph->inter[0] = graph->inter[1] = 0;

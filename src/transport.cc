@@ -8,13 +8,9 @@
 #include "info.h"
 #include "bootstrap.h"
 
-extern struct ncclTransport p2pTransport;
-extern struct ncclTransport shmTransport;
 extern struct ncclTransport netTransport;
 
 struct ncclTransport ncclTransports[NTRANSPORTS] = {
-  p2pTransport,
-  shmTransport,
   netTransport,
 };
 
@@ -83,5 +79,3 @@ ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* 
   TRACE(NCCL_INIT, "nsend %d nrecv %d nSkippedSend %u nSkippedRecv %u - DONE", nsend, nrecv, nSkippedSend, nSkippedRecv);
   return ncclSuccess;
 }
-
-

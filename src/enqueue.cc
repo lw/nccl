@@ -114,7 +114,7 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.p2p.recvCount = info->recvbytes;
   coll->args.p2p.delta = info->delta;
   coll->funcIndex = 0;
-  coll->args.p2p.nThreads = info->nThreads = info->comm->maxThreads[NCCL_ALGO_RING][NCCL_PROTO_SIMPLE]+2*WARP_SIZE;
+  coll->args.p2p.nThreads = info->nThreads = info->comm->maxThreads + 2*WARP_SIZE;
   return ncclSuccess;
 }
 

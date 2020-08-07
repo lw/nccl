@@ -14,10 +14,9 @@
 typedef enum { ncclCollSendRecv } ncclFunc_t;
 extern const char* ncclFuncStr[0];
 
-#define NCCL_NUM_ALGORITHMS 3 // Tree/Ring/CollNet
+#define NCCL_NUM_ALGORITHMS 2 // Tree/Ring
 #define NCCL_ALGO_TREE 0
 #define NCCL_ALGO_RING 1
-#define NCCL_ALGO_COLLNET 2
 extern const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS];
 
 #define NCCL_NUM_PROTOCOLS 3 // Simple/LL/LL128
