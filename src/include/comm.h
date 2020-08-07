@@ -75,7 +75,6 @@ struct ncclComm {
   int nNodes;
   int localRanks;
 
-  enum { GROUP, PARALLEL } launchMode;
   cudaStream_t userStream;
   bool userStreamSet;
   cudaEvent_t doneEvent;
@@ -102,10 +101,6 @@ struct ncclComm {
   float bandwidths[0][NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
   int maxThreads[NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
 
-  // An internal CUDA stream for NCCL kernel CGMD launches
-  int groupCudaStream;
-  cudaStream_t groupStream;
-
   // Whether there has been a fatal error in this communicator.
   ncclResult_t fatalError;
 
@@ -130,8 +125,6 @@ struct ncclComm {
   struct cudaLaunchParams * intraParams;
   struct cudaLaunchParams *myParams;
   int* intraCudaDevs;
-  int* intraCGMode; // Whether we can use CUDA9 CGMD or not
-  int* intraCC; // Only to check all have the same ComputeCap and disable CGMode if not
   struct ncclColl args;
   void* argsptr;
 

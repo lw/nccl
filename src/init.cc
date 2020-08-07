@@ -177,19 +177,12 @@ static ncclResult_t commFree(ncclComm_t comm) {
   if (comm->doneEvent != NULL)
     CUDACHECK(cudaEventDestroy(comm->doneEvent));
 
-  if (comm->launchMode == ncclComm::GROUP) {
-    CUDACHECK(cudaStreamDestroy(comm->groupStream));
-  }
-
   // Last rank frees shared resources between threads
-  int isLast;
-  NCCLCHECK(ncclCpuBarrierIn(comm, &isLast));
+  int isLast = 1;
   if (isLast) {
     free(comm->intraBarrier);
     free(comm->intraParams);
     free(comm->intraCudaDevs);
-    free(comm->intraCGMode);
-    free(comm->intraCC);
   }
   CUDACHECK(cudaFreeHost((void *)comm->abortFlag));
   CUDACHECK(cudaFreeHost((void *)comm->fatalDevError));
@@ -227,12 +220,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
 
   comm->doneEvent = doneEvent;
   comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;
-#if CUDART_VERSION >= 9020
-  comm->groupCudaStream = ncclParamGroupCudaStream();
-#else
-  // Don't allow the user to overload the default setting in older CUDA builds
-  comm->groupCudaStream = NCCL_GROUP_CUDA_STREAM;
-#endif
   comm->fatalError = ncclSuccess;
 
   NCCLCHECK(ncclCudaHostCalloc((ncclDevError_t**)&comm->fatalDevError, 1));
@@ -272,19 +259,6 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   NCCLCHECK(ncclCudaCalloc(&comm->devComm, 1));
   NCCLCHECK(ncclCudaMemcpy(comm->devComm, &comm->hostDevComm, 1));
   return ncclSuccess;
-}
-
-// Pre-process the string so that running "strings" on the lib can quickly reveal the version.
-#define VERSION_STRING "NCCL version " STR(NCCL_MAJOR) "." STR(NCCL_MINOR) "." STR(NCCL_PATCH) NCCL_SUFFIX "+cuda" STR(CUDA_MAJOR) "." STR(CUDA_MINOR)
-static void showVersion() {
-  static int shown = 0;
-  if (shown == 0 && ncclDebugLevel >= NCCL_LOG_VERSION) {
-    printf("%s\n", VERSION_STRING);
-    fflush(stdout);
-    if (ncclDebugFile != stdout)
-      INFO(NCCL_ALL,"%s", VERSION_STRING); // Also log NCCL version in one of the files
-    shown = 1;
-  }
 }
 
 static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, uint64_t commHash) {
@@ -355,47 +329,14 @@ ncclResult_t ncclCommSetIntra(struct ncclComm* comm, int rank, int ranks, struct
     comm->intraBarrier = bar;
     NCCLCHECK(ncclCalloc(&comm->intraParams, comm->intraRanks));
     NCCLCHECK(ncclCalloc(&comm->intraCudaDevs, comm->intraRanks));
-    int* CGMode;
-    NCCLCHECK(ncclCalloc(&CGMode, 1));
-    *CGMode = 0x11;
-    comm->intraCGMode = CGMode;
-    int* CC;
-    NCCLCHECK(ncclCalloc(&CC, 1));
-    *CC = ncclCudaCompCap();
-    comm->intraCC = CC;
   } else {
     comm->intraBarrier = (int*)waitForNonNullPtr(&comm0->intraBarrier);
     comm->intraParams = (struct cudaLaunchParams*)waitForNonNullPtr(&comm0->intraParams);
     comm->intraCudaDevs = (int*)waitForNonNullPtr(&comm0->intraCudaDevs);
-    comm->intraCGMode = (int*)waitForNonNullPtr(&comm0->intraCGMode);
-    comm->intraCC = (int*)waitForNonNullPtr(&comm0->intraCC);
   }
   comm->intraCudaDevs[comm->intraRank] = comm->cudaDev;
   NCCLCHECK(initParams(comm));
 
-  int cgMdLaunch = 0;
-
-  // Set CG Mode
-  comm->launchMode = ncclComm::GROUP;
-  char* str = getenv("NCCL_LAUNCH_MODE");
-  if (str) INFO(NCCL_ENV, "NCCL_LAUNCH_MODE set by environment to %s", str);
-  if (comm->intraRanks == 1 || (str && strcmp(str, "PARALLEL") == 0)) {
-    comm->launchMode = ncclComm::PARALLEL;
-  }
-  if (comm->launchMode == ncclComm::GROUP) {
-    CUDACHECK(cudaStreamCreateWithFlags(&comm->groupStream, cudaStreamNonBlocking));
-#if CUDART_VERSION >= 9000
-    if (*comm->intraCC && (ncclCudaCompCap() == *comm->intraCC)) {
-      // Check whether the GPU supports Cooperative Group Multi Device Launch
-      (void) cudaDeviceGetAttribute(&cgMdLaunch, cudaDevAttrCooperativeMultiDeviceLaunch, comm->cudaDev);
-    }
-#endif
-  }
-
-  // Disable cgMdLaunch if any rank does not support it
-  if (cgMdLaunch == 0) {
-    *comm->intraCGMode = 0x10;
-  }
   return ncclSuccess;
 }
 
@@ -856,14 +797,8 @@ cleanup:
 
 static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
-  char* env = getenv("NCCL_COMM_ID");
-  if (env && myrank == 0) {
-    INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);
-    NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);
-  }
 
   NCCLCHECKGOTO(ncclInit(), res, end);
-  if (myrank == 0) showVersion();
 
   // Make sure the CUDA runtime is initialized.
   CUDACHECKGOTO(cudaFree(NULL), res, end);
@@ -875,11 +810,7 @@ static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUni
     goto end;
   }
 
-  if (ncclAsyncMode()) {
-    NCCLCHECKGOTO(ncclAsyncInit(ncclCommInitRankSync, newcomm, nranks, commId, myrank, cudaDev), res, end);
-  } else {
-    NCCLCHECKGOTO(ncclCommInitRankSync(newcomm, nranks, commId, myrank, cudaDev), res, end);
-  }
+  NCCLCHECKGOTO(ncclCommInitRankSync(newcomm, nranks, commId, myrank, cudaDev), res, end);
 end:
   if (ncclAsyncMode()) return ncclAsyncErrCheck(res);
   else return res;
@@ -890,25 +821,6 @@ ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId comm
   int cudaDev;
   CUDACHECK(cudaGetDevice(&cudaDev));
   NCCLCHECK(ncclCommInitRankDev(newcomm, nranks, commId, myrank, cudaDev));
-  return ncclSuccess;
-}
-
-NCCL_API(ncclResult_t, ncclCommInitAll, ncclComm_t* comms, int ndev, const int* devlist);
-ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist) {
-  NCCLCHECK(PtrCheck(comms, "CommInitAll", "comms"));
-  if (ndev < 0) {
-    WARN("Invalid device count requested : %d", ndev);
-    return ncclInvalidArgument;
-  }
-
-  ncclUniqueId uniqueId;
-  NCCLCHECK(ncclGetUniqueId(&uniqueId));
-  NCCLCHECK(ncclGroupStart());
-  for (int i=0; i<ndev; i++) {
-    // Ignore return codes .. we need to call ncclGroupEnd to clean up anyway
-    ncclCommInitRankDev(comms+i, ndev, uniqueId, i, devlist ? devlist[i] : i);
-  }
-  NCCLCHECK(ncclGroupEnd());
   return ncclSuccess;
 }
 
@@ -926,7 +838,6 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
 
   TRACE(NCCL_INIT, "Destroying comm %p rank %d abortFlag %d fatalError %d", comm, rank, *comm->abortFlag, comm->fatalError);
 
-  CUDACHECK(cudaStreamSynchronize(comm->groupStream));
   NCCLCHECK(ncclProxyDestroy(comm));
   NCCLCHECK(commFree(comm));
 

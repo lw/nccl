@@ -43,6 +43,12 @@ static __device__ void load_coll(struct ncclColl* localColl, struct ncclColl* ho
 
 extern __device__ volatile uint64_t* ncclShmem;
 
+#define NCCL_COLL_NAME(coll, op, dtype) \
+  coll##_##op##_##dtype
+
+#define NCCL_KERN_NAME(coll, op, dtype) \
+  coll##Kernel_##op##_##dtype
+
 /* Functions for aggregation case */
 #define IMPL_COLL_FUNC(coll, op, ncclFunc, dtype, ctype) \
 __device__ void NCCL_COLL_NAME(coll, op, dtype)(struct CollectiveArgs* args) { \
