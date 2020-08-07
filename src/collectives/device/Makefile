@@ -10,7 +10,7 @@ include ../../../makefiles/version.mk
 BUILDDIR ?= $(abspath ../../../build)
 OBJDIR := $(BUILDDIR)/obj/collectives/device
 
-LIBSRCFILES := all_reduce.cu broadcast.cu reduce.cu all_gather.cu reduce_scatter.cu sendrecv.cu
+LIBSRCFILES := sendrecv.cu
 
 LIBSRCFILES += functions.cu
 
@@ -28,13 +28,12 @@ all: $(STATICLIB)
 # Dummy rule so that the extra dependency (%.dep) files are preserved by make
 all_deps: $(DEPENDFILES)
 
-# Auto-generating the rules per op/reduction/datatype/algorithm
-$(RULESFILE) :
-	@printf "Generating %-35s > %s\n" rules $@
-	@mkdir -p $(OBJDIR)
-	@./gen_rules.sh $(OBJDIR) > $@
+$(OBJDIR)/sendrecv_sum_i8.o : sendrecv.cu $(OBJDIR)/sendrecv.dep
+	@printf "Compiling  %-35s > %s\n" sendrecv.cu $(OBJDIR)/sendrecv_sum_i8.o
+	mkdir -p $(OBJDIR)
+	$(NVCC) -DNCCL_OP=0 -DNCCL_TYPE=0 $(NVCUFLAGS) -dc sendrecv.cu -o $(OBJDIR)/sendrecv_sum_i8.o
 
--include $(RULESFILE)
+GENOBJS	   := $(OBJDIR)/sendrecv_sum_i8.o
 
 LIBOBJ     := $(GENOBJS) $(OBJDIR)/functions.o
 
