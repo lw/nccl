@@ -31,7 +31,7 @@ all_deps: $(DEPENDFILES)
 $(OBJDIR)/sendrecv_sum_i8.o : sendrecv.cu $(OBJDIR)/sendrecv.dep
 	@printf "Compiling  %-35s > %s\n" sendrecv.cu $(OBJDIR)/sendrecv_sum_i8.o
 	mkdir -p $(OBJDIR)
-	$(NVCC) -DNCCL_OP=0 -DNCCL_TYPE=0 $(NVCUFLAGS) -dc sendrecv.cu -o $(OBJDIR)/sendrecv_sum_i8.o
+	$(NVCC) $(NVCUFLAGS) -dc sendrecv.cu -o $(OBJDIR)/sendrecv_sum_i8.o
 
 GENOBJS	   := $(OBJDIR)/sendrecv_sum_i8.o
 
