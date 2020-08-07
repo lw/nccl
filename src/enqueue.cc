@@ -8,59 +8,9 @@
 #include "argcheck.h"
 #include "coll_net.h"
 
-// Only generate inline kernels for LL
-#define NCCL_FUNC5(coll, op, dtype) \
-  (void*)NCCL_KERN_NAME(coll##LL, op, dtype), \
-  (void*)NCCL_KERN_NAME(coll##LL, op, dtype), \
-  (void*)NCCL_KERN_NAME(coll##LL, op, dtype)
-
-#define NCCL_FUNC4(coll, op, dtype) \
-  (void*)NCCL_FUNC5(coll##Tree, op, dtype), \
-  (void*)NCCL_FUNC5(coll##Ring, op, dtype), \
-  (void*)NCCL_FUNC5(coll##CollNet, op, dtype)
-
-// Must be consistent with ncclDataType_t
-#define NCCL_FUNCS3A(coll, op) \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  u8), \
-  (void*)NCCL_FUNC4(coll, op, i32), \
-  (void*)NCCL_FUNC4(coll, op, u32), \
-  (void*)NCCL_FUNC4(coll, op, i64), \
-  (void*)NCCL_FUNC4(coll, op, u64), \
-  (void*)NCCL_FUNC4(coll, op, f16), \
-  (void*)NCCL_FUNC4(coll, op, f32), \
-  (void*)NCCL_FUNC4(coll, op, f64)
-#define NCCL_FUNCS3B(coll, op) \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8), \
-  (void*)NCCL_FUNC4(coll, op,  i8)
-
-// Must be consistent with ncclRedOp_t -- but we only generate kernel for sums.
-#define NCCL_FUNCS2A(coll) \
-  NCCL_FUNCS3A(coll, sum), \
-  NCCL_FUNCS3A(coll, sum), \
-  NCCL_FUNCS3A(coll, sum), \
-  NCCL_FUNCS3A(coll, sum)
-#define NCCL_FUNCS2B(coll) \
-  NCCL_FUNCS3B(coll, copy), \
-  NCCL_FUNCS3B(coll, copy), \
-  NCCL_FUNCS3B(coll, copy), \
-  NCCL_FUNCS3B(coll, copy)
-
 // Must be consistent with the ncclFuncSet enum
-static void* const ncclKerns[1+NCCL_NUM_FUNCTIONS*ncclNumOps*ncclNumTypes*NCCL_NUM_ALGORITHMS*NCCL_NUM_PROTOCOLS] = {
-  (void*)NCCL_KERN_NAME(ncclSendRecv, copy, i8),
-  NCCL_FUNCS2B(ncclBroadcast),
-  NCCL_FUNCS2A(ncclReduce),
-  NCCL_FUNCS2B(ncclAllGather),
-  NCCL_FUNCS2A(ncclReduceScatter),
-  NCCL_FUNCS2A(ncclAllReduce)
+static void* const ncclKerns[1] = {
+  (void*)NCCL_KERN_NAME(ncclSendRecv, copy, i8)
 };
 
 /*****************************************************************************/
@@ -296,15 +246,6 @@ static ncclResult_t getAlgoInfo(struct ncclInfo* info) {
 
 static ncclResult_t getPatternInfo(struct ncclInfo* info) {
   switch (info->coll) {
-    case ncclCollBroadcast:
-      info->pattern = info->algorithm == NCCL_ALGO_TREE ? ncclPatternTreeDown : ncclPatternPipelineFrom; break;
-    case ncclCollReduce:
-      info->pattern = info->algorithm == NCCL_ALGO_TREE ? ncclPatternTreeUp : ncclPatternPipelineTo; break;
-    case ncclCollReduceScatter:
-    case ncclCollAllGather:
-      info->pattern = ncclPatternRing; break;
-    case ncclCollAllReduce:
-      info->pattern = info->algorithm == NCCL_ALGO_COLLNET ? ncclPatternCollTreeUp : info->algorithm == NCCL_ALGO_TREE ? ncclPatternTreeUpDown : ncclPatternRingTwice; break;
     default:
       WARN("Unknown pattern for collective %d algorithm %d", info->coll, info->algorithm);
       return ncclInternalError;

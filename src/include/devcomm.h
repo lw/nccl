@@ -11,9 +11,8 @@
 #include "align.h"
 #include <stdint.h>
 
-#define NCCL_NUM_FUNCTIONS 5 // SendRecv not included for now
-typedef enum { ncclCollBroadcast, ncclCollReduce, ncclCollAllGather, ncclCollReduceScatter, ncclCollAllReduce, ncclCollSendRecv} ncclFunc_t;
-extern const char* ncclFuncStr[NCCL_NUM_FUNCTIONS];
+typedef enum { ncclCollSendRecv } ncclFunc_t;
+extern const char* ncclFuncStr[0];
 
 #define NCCL_NUM_ALGORITHMS 3 // Tree/Ring/CollNet
 #define NCCL_ALGO_TREE 0

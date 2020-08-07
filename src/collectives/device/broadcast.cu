@@ -7,5 +7,3 @@
 #include "broadcast.h"
 #include "common.h"
 #include "collectives.h"
-
-IMPL_COLL_C(ncclBroadcast, ncclCollBroadcast);

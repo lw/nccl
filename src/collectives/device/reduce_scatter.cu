@@ -7,5 +7,3 @@
 #include "reduce_scatter.h"
 #include "common.h"
 #include "collectives.h"
-
-IMPL_COLL_R(ncclReduceScatter, ncclCollReduceScatter);
