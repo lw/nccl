@@ -179,24 +179,20 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
   if (info->recvbuff == NULL) {
     if (peer != comm->rank) {
       int delta = (comm->nRanks - (comm->rank-peer)) % comm->nRanks;
-      for (int c=0; c<comm->p2pnChannelsPerPeer; c++) {
-        int channelId = (delta+comm->p2pChannels[c]) % comm->p2pnChannels;
+        int channelId = delta % comm->p2pnChannels;
         if (comm->channels[channelId].peers[peer].send.connected == 0) {
           p2plist->connect.send[channelId*comm->nRanks+p2plist->connect.nsend[channelId]++] = peer;
         }
-      }
     }
     p2plist->peerlist[info->root].sendbytes = nBytes;
     p2plist->peerlist[info->root].sendbuff = info->sendbuff;
   } else {
     if (peer != comm->rank) {
       int delta = (comm->nRanks + (comm->rank-peer)) % comm->nRanks;
-      for (int c=0; c<comm->p2pnChannelsPerPeer; c++) {
-        int channelId = (delta+comm->p2pChannels[c]) % comm->p2pnChannels;
+        int channelId = delta % comm->p2pnChannels;
         if (comm->channels[channelId].peers[peer].recv.connected == 0) {
           p2plist->connect.recv[channelId*comm->nRanks+p2plist->connect.nrecv[channelId]++] = peer;
         }
-      }
     }
     p2plist->peerlist[info->root].recvbytes = nBytes;
     p2plist->peerlist[info->root].recvbuff = info->recvbuff;

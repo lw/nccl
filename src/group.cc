@@ -217,7 +217,7 @@ ncclResult_t ncclGroupEnd() {
           int remaining = 1;
           int chunk = 0;
           while (remaining) {
-            int channelId = (delta+comm->p2pChannels[chunk%comm->p2pnChannelsPerPeer]) % comm->p2pnChannels;
+            int channelId = delta % comm->p2pnChannels;
             remaining = 0;
             ssize_t recvbytes = p2plist->peerlist[from].recvbytes-recvOffset;
             ssize_t sendbytes = p2plist->peerlist[to].sendbytes-sendOffset;
