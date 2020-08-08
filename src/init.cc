@@ -398,7 +398,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Get rings and trees
   struct ncclTopoGraph ringGraph;
   ringGraph.id = 0;
-  ringGraph. = NCCL_TOPO__RING;
   ringGraph.crossNic = ncclParamCrossNic();
   ringGraph.minChannels = 1;
   ringGraph.maxChannels = MAXCHANNELS/2;
@@ -407,7 +406,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   struct ncclTopoGraph treeGraph;
   treeGraph.id = 1;
-  treeGraph. = NCCL_TOPO__SPLIT_TREE;
   treeGraph.crossNic = ncclParamCrossNic();
   treeGraph.minChannels = 1;
   treeGraph.maxChannels = ringGraph.nChannels;

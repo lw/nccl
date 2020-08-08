@@ -367,16 +367,10 @@ ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeer
 
     if (peerInfos == NULL) continue;
     // Remove GPUs we can't talk to because of containers.
-    struct ncclPeerInfo* dstInfo = peerInfos+system->nodes[GPU].nodes[g].gpu.rank;
     for (int p=0; p<system->nodes[GPU].count; p++) {
       if (p == g) continue;
-      struct ncclPeerInfo* srcInfo = peerInfos+system->nodes[GPU].nodes[p].gpu.rank;
-      int shm;
-      NCCLCHECK(ncclTransports[TRANSPORT_SHM].canConnect(&shm, system, NULL, srcInfo, dstInfo));
-      if (shm == 0) {
-        // Mark this peer as inaccessible. We'll trim it later.
-        system->nodes[GPU].nodes[p].paths[GPU][g].count = 0;
-      }
+      // Mark this peer as inaccessible. We'll trim it later.
+      system->nodes[GPU].nodes[p].paths[GPU][g].count = 0;
     }
   }
 
