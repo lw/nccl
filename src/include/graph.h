@@ -76,17 +76,6 @@ ncclResult_t ncclTopoCompute(struct ncclTopoSystem* system, struct ncclTopoGraph
 ncclResult_t ncclTopoPrintGraph(struct ncclTopoSystem* system, struct ncclTopoGraph* graph);
 ncclResult_t ncclTopoDumpGraphs(struct ncclTopoSystem* system, int ngraphs, struct ncclTopoGraph** graphs);
 
-struct ncclTopoRanks {
-  // int ringRecv[MAXCHANNELS];
-  // int ringSend[MAXCHANNELS];
-  // int ringPrev[MAXCHANNELS];
-  // int ringNext[MAXCHANNELS];
-  // int treeUpRecv[MAXCHANNELS];
-  // int treeUpSend[MAXCHANNELS];
-  // int treeDnRecv[MAXCHANNELS];
-  // int treeDnSend[MAXCHANNELS];
-};
-
 ncclResult_t ncclTopoTuneModel(struct ncclComm* comm, int minCompCap, int maxCompCap);
 #include "info.h"
 

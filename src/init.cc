@@ -335,7 +335,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
     int cudaCompCap;
     int fullCudaCompCap;
     int nChannels;
-    struct ncclTopoRanks topoRanks;
   } *allGather3Data;
 
   NCCLCHECK(ncclCalloc(&allGather3Data, nranks));
@@ -357,8 +356,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   }
 
   int nChannelsOrig = comm->nChannels;
-  struct ncclTopoRanks** allTopoRanks;
-  NCCLCHECK(ncclCalloc(&allTopoRanks, comm->nRanks));
   for (int i=0; i<nranks; i++) {
     // Make sure we align all ranks so that the tuning is consistent across ranks
     comm->nChannels = std::min(allGather3Data[i].nChannels, comm->nChannels);
