@@ -226,9 +226,9 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
 
   // Copy userRanks and peers
-  for (int r=0; r<comm->p2pnChannels; r++) {
-    NCCLCHECK(ncclCudaMemcpy(comm->channels[r].ring.devUserRanks, comm->channels[r].ring.userRanks, comm->nRanks));
-  }
+  // for (int r=0; r<comm->p2pnChannels; r++) {
+  //   NCCLCHECK(ncclCudaMemcpy(comm->channels[r].ring.devUserRanks, comm->channels[r].ring.userRanks, comm->nRanks));
+  // }
 
   // Duplicate the dev comm on the device
   NCCLCHECK(ncclCudaCalloc(&comm->devComm, 1));

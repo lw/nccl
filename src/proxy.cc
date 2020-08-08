@@ -99,11 +99,11 @@ static ncclResult_t SaveProxy(int peer, struct ncclProxyArgs* args) {
 }
 
 ncclResult_t ncclProxySaveColl(struct ncclProxyArgs* args, int pattern, int root, int nranks) {
-  if (pattern == ncclPatternRing) {
-    struct ncclRing* ring = &args->channel->ring;
-    if (NeedProxy(RECV, pattern, root, ring, nranks)) NCCLCHECK(SaveProxy<proxyRecv>(ring->prev, args));
-    if (NeedProxy(SEND, pattern, root, ring, nranks)) NCCLCHECK(SaveProxy<proxySend>(ring->next, args));
-  }
+  // if (pattern == ncclPatternRing) {
+  //   struct ncclRing* ring = &args->channel->ring;
+  //   if (NeedProxy(RECV, pattern, root, ring, nranks)) NCCLCHECK(SaveProxy<proxyRecv>(ring->prev, args));
+  //   if (NeedProxy(SEND, pattern, root, ring, nranks)) NCCLCHECK(SaveProxy<proxySend>(ring->next, args));
+  // }
   return ncclSuccess;
 }
 

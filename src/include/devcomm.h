@@ -179,11 +179,11 @@ static_assert(sizeof(struct ncclColl) == (0x10*sizeof(int)), "ncclColl must have
 struct ncclChannel {
   union {
     struct {
-      struct ncclRing ring;
-      struct ncclTree treeUp;
-      struct ncclTree treeDn;
-      struct ncclTree collTreeUp;
-      struct ncclTree collTreeDn;
+      // struct ncclRing ring;
+      // struct ncclTree treeUp;
+      // struct ncclTree treeDn;
+      // struct ncclTree collTreeUp;
+      // struct ncclTree collTreeDn;
 
       int id;
 
