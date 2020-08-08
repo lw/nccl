@@ -20,7 +20,7 @@ static ncclResult_t selectTransport(struct ncclTopoSystem* topo, struct ncclTopo
     struct ncclTransport *transport = ncclTransports+t;
     struct ncclTransportComm* transportComm = type == 1 ? &transport->send : &transport->recv;
     int ret = 0;
-    NCCLCHECK(transport->canConnect(&ret, topo, graph, myInfo, peerInfo));
+    NCCLCHECK(transport->canConnect(&ret, graph, myInfo, peerInfo));
     if (ret) {
       connector->transportComm = transportComm;
       NCCLCHECK(transportComm->setup(topo, graph, myInfo, peerInfo, connect, connector, channelId));

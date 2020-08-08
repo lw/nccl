@@ -30,8 +30,11 @@ static int getNthreads(const char* name, int env, int min, int max, int def) {
   return nt;
 }
 
-ncclResult_t ncclTopoTuneModel(struct ncclComm* comm, int minCompCap, int maxCompCap, struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph) {
-  int simpleDefaultThreads = (ringGraph->speedIntra*ringGraph->nChannels <= PCI_WIDTH) ? 256 : NCCL_MAX_NTHREADS;
+ncclResult_t ncclTopoTuneModel(
+  struct ncclComm* comm,
+  int minCompCap,
+  int maxCompCap) {
+  int simpleDefaultThreads = NCCL_MAX_NTHREADS;
   comm->maxThreads =
     getNthreads("NCCL_NTHREADS", ncclParamNthreads(), 2*WARP_SIZE, NCCL_MAX_NTHREADS, simpleDefaultThreads);
 

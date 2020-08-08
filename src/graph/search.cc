@@ -668,16 +668,6 @@ search:
   globalTimeout -= time;
 
   NCCLCHECK(ncclTopoSearchRec(system, &tmpGraph, graph, &time));
-#if 0
-  printf("Pattern %d, crossNic %d, Speed %g/%g, type %d/%d, channels %d-%d sameChannels %d -> nChannels %dx%g/%g %s\n", tmpGraph.pattern, tmpGraph.crossNic, tmpGraph.speedInter, tmpGraph.speedIntra, tmpGraph.typeInter, tmpGraph.typeIntra, tmpGraph.minChannels, tmpGraph.maxChannels, tmpGraph.sameChannels, graph->nChannels, graph->speedInter, graph->speedIntra, time == 0 ? "TIMEOUT" : "");
-  for (int c=0; c<graph->nChannels; c++) {
-    printf("%2d : ", c);
-    for (int g=0; g<ngpus; g++) {
-      printf("%d ", graph->intra[c*ngpus+g]);
-    }
-    printf("\n");
-  }
-#endif
   // Optimal solution, stop here
   if (graph->nChannels == graph->maxChannels && graph->speedInter == system->maxWidth) goto done;
 

@@ -77,24 +77,17 @@ ncclResult_t ncclTopoPrintGraph(struct ncclTopoSystem* system, struct ncclTopoGr
 ncclResult_t ncclTopoDumpGraphs(struct ncclTopoSystem* system, int ngraphs, struct ncclTopoGraph** graphs);
 
 struct ncclTopoRanks {
-  int ringRecv[MAXCHANNELS];
-  int ringSend[MAXCHANNELS];
-  int ringPrev[MAXCHANNELS];
-  int ringNext[MAXCHANNELS];
-  int treeUpRecv[MAXCHANNELS];
-  int treeUpSend[MAXCHANNELS];
-  int treeDnRecv[MAXCHANNELS];
-  int treeDnSend[MAXCHANNELS];
+  // int ringRecv[MAXCHANNELS];
+  // int ringSend[MAXCHANNELS];
+  // int ringPrev[MAXCHANNELS];
+  // int ringNext[MAXCHANNELS];
+  // int treeUpRecv[MAXCHANNELS];
+  // int treeUpSend[MAXCHANNELS];
+  // int treeDnRecv[MAXCHANNELS];
+  // int treeDnSend[MAXCHANNELS];
 };
 
-ncclResult_t ncclTopoPreset(struct ncclComm* comm,
-    struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph,
-    struct ncclTopoRanks* topoRanks);
-
-ncclResult_t ncclTopoPostset(struct ncclComm* comm, int* firstRanks,
-    struct ncclTopoRanks** allTopoRanks, int* rings);
-
-ncclResult_t ncclTopoTuneModel(struct ncclComm* comm, int minCompCap, int maxCompCap, struct ncclTopoGraph* treeGraph, struct ncclTopoGraph* ringGraph);
+ncclResult_t ncclTopoTuneModel(struct ncclComm* comm, int minCompCap, int maxCompCap);
 #include "info.h"
 
 #endif

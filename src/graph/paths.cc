@@ -463,7 +463,9 @@ ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
   comm->p2pnChannels = nextPow2(comm->p2pnChannels);
 
   // Init channels that weren't used so far
-  for (int c=comm->nChannels; c<comm->p2pnChannels; c++) NCCLCHECK(initChannel(comm, c));
+  for (int c=comm->nChannels; c<comm->p2pnChannels; c++) {
+    NCCLCHECK(initChannel(comm, c));
+  }
 
   INFO(NCCL_INIT, "%d coll channels, %d p2p channels, 1 p2p channels per peer", comm->nChannels, comm->p2pnChannels);
   return ncclSuccess;

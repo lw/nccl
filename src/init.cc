@@ -247,24 +247,6 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
   return ncclSuccess;
 }
 
-static ncclResult_t setupChannel(struct ncclComm* comm, int channelId, int rank, int nranks, int* ringRanks) {
-  TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);
-  NCCLCHECK(initChannel(comm, channelId));
-
-  struct ncclRing* ring = &comm->channels[channelId].ring;
-  // Reorganize ranks to start with rank.
-  int shift;
-  for (shift = 0; shift<nranks; shift++) {
-    if (ringRanks[shift] == rank) {
-      break;
-    }
-  }
-  for (int i=0; i<nranks; i++) {
-    ring->userRanks[i] = ringRanks[(i+shift)%nranks];
-  }
-  return ncclSuccess;
-}
-
 void* waitForNonNullPtr(void* p) {
   volatile void** ptr = (volatile void**) p;
   while (*ptr == NULL) sched_yield();
@@ -290,13 +272,8 @@ NCCL_PARAM(LlBuffSize, "LL_BUFFSIZE", -2);
 NCCL_PARAM(Ll128BuffSize, "LL128_BUFFSIZE", -2);
 
 static ncclResult_t computeBuffSizes(struct ncclComm* comm) {
-  int cpuArch, cpuVendor, cpuModel;
-  NCCLCHECK(ncclTopoCpuType(comm->topo, &cpuArch, &cpuVendor, &cpuModel));
-
   int64_t envs[NCCL_NUM_PROTOCOLS] = { ncclParamLlBuffSize(), ncclParamLl128BuffSize(), ncclParamBuffSize() };
   int defaults[NCCL_NUM_PROTOCOLS] = { DEFAULT_LL_BUFFSIZE, DEFAULT_LL128_BUFFSIZE, DEFAULT_BUFFSIZE };
-
-  if (cpuArch == NCCL_TOPO_CPU_ARCH_ARM) defaults[NCCL_PROTO_SIMPLE] = DEFAULT_BUFFSIZE_ARM;
 
   for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     comm->buffSizes[p] = comm->hostDevComm.buffSizes[p] = envs[p] != -2 ? envs[p] : defaults[p];
@@ -322,11 +299,9 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // AllGather1 - begin
   struct {
     struct ncclPeerInfo peerInfo;
-    struct ncclComm* comm;
   } *allGather1Data;
 
   NCCLCHECK(ncclCalloc(&allGather1Data, nranks));
-  allGather1Data[rank].comm = comm;
   struct ncclPeerInfo* myInfo = &allGather1Data[rank].peerInfo;
   NCCLCHECK(fillInfo(comm, myInfo, commHash));
   NCCLCHECK(bootstrapAllGather(comm->bootstrap, allGather1Data, sizeof(*allGather1Data)));
@@ -354,77 +329,24 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Print final topology
   NCCLCHECK(ncclTopoPrint(comm->topo));
 
-  // Get rings and trees
-  struct ncclTopoGraph ringGraph;
-  ringGraph.id = 0;
-  ringGraph.crossNic = ncclParamCrossNic();
-  ringGraph.minChannels = 1;
-  ringGraph.maxChannels = MAXCHANNELS/2;
-  NCCLCHECK(ncclTopoCompute(comm->topo, &ringGraph));
-  NCCLCHECK(ncclTopoPrintGraph(comm->topo, &ringGraph));
-
-  struct ncclTopoGraph treeGraph;
-  treeGraph.id = 1;
-  treeGraph.crossNic = ncclParamCrossNic();
-  treeGraph.minChannels = 1;
-  treeGraph.maxChannels = ringGraph.nChannels;
-  NCCLCHECK(ncclTopoCompute(comm->topo, &treeGraph));
-  NCCLCHECK(ncclTopoPrintGraph(comm->topo, &treeGraph));
-
-  if (comm->rank == ncclParamGraphDumpFileRank()) {
-    struct ncclTopoGraph* graphs[3] = { &ringGraph, &treeGraph };
-    NCCLCHECK(ncclTopoDumpGraphs(comm->topo, 3, graphs));
-  }
-
   // AllGather3 - begin
-  struct ncclGraphInfo {
-    int sameChannels;
-    float speedIntra;
-    float speedInter;
-    int typeIntra;
-  };
 
   struct {
     int cudaCompCap;
     int fullCudaCompCap;
     int nChannels;
-    struct ncclGraphInfo tree;
-    struct ncclGraphInfo ring;
     struct ncclTopoRanks topoRanks;
   } *allGather3Data;
 
   NCCLCHECK(ncclCalloc(&allGather3Data, nranks));
   allGather3Data[rank].cudaCompCap = ncclCudaCompCap();
-  allGather3Data[rank].nChannels = comm->nChannels = treeGraph.nChannels = ringGraph.nChannels =
-    std::min(treeGraph.nChannels, ringGraph.nChannels);
-  allGather3Data[rank].tree.sameChannels = treeGraph.sameChannels;
-  allGather3Data[rank].tree.speedIntra = treeGraph.speedIntra;
-  allGather3Data[rank].tree.speedInter = treeGraph.speedInter;
-  allGather3Data[rank].tree.typeIntra = treeGraph.typeIntra;
-  allGather3Data[rank].ring.sameChannels = ringGraph.sameChannels;
-  allGather3Data[rank].ring.speedIntra = ringGraph.speedIntra;
-  allGather3Data[rank].ring.speedInter = ringGraph.speedInter;
-  allGather3Data[rank].ring.typeIntra = ringGraph.typeIntra;
-
-  NCCLCHECK(ncclTopoPreset(comm, &treeGraph, &ringGraph, &allGather3Data[rank].topoRanks));
+  allGather3Data[rank].nChannels = comm->nChannels = 2;
 
   NCCLCHECK(bootstrapAllGather(comm->bootstrap, allGather3Data, sizeof(*allGather3Data)));
 
   // Determine nNodes, firstRanks, ...
-  int* nodesFirstRank;
-  NCCLCHECK(ncclCalloc(&nodesFirstRank, nranks));
-  for (int i=0; i<nranks; i++) {
-    int node = -1;
-    int firstRank = allGather3Data[i].topoRanks.ringRecv[0];
-    for (int n=0; n<comm->nNodes; n++) {
-      if (nodesFirstRank[n] == firstRank) node = n;
-    }
-    if (node == -1) {
-      node = comm->nNodes++;
-      nodesFirstRank[node] = firstRank;
-    }
-    if (i == comm->rank) comm->node = node;
-  }
+  comm->nNodes = 2;
+  comm->node = rank;
 
   // Determine the minimum CUDA Compute capability of all GPUs
   int myCompCap = allGather3Data[rank].cudaCompCap;
@@ -438,51 +360,27 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   struct ncclTopoRanks** allTopoRanks;
   NCCLCHECK(ncclCalloc(&allTopoRanks, comm->nRanks));
   for (int i=0; i<nranks; i++) {
-    allTopoRanks[i] = &allGather3Data[i].topoRanks;
     // Make sure we align all ranks so that the tuning is consistent across ranks
-    treeGraph.nChannels = ringGraph.nChannels = comm->nChannels = std::min(allGather3Data[i].nChannels, comm->nChannels);
-    treeGraph.sameChannels = std::min(allGather3Data[i].tree.sameChannels, treeGraph.sameChannels);
-    treeGraph.speedIntra = std::min(allGather3Data[i].tree.speedIntra, treeGraph.speedIntra);
-    treeGraph.speedInter = std::min(allGather3Data[i].tree.speedInter, treeGraph.speedInter);
-    treeGraph.typeIntra = std::min(allGather3Data[i].tree.typeIntra, treeGraph.typeIntra);
-    ringGraph.sameChannels = std::min(allGather3Data[i].ring.sameChannels, ringGraph.sameChannels);
-    ringGraph.speedIntra = std::min(allGather3Data[i].ring.speedIntra, ringGraph.speedIntra);
-    ringGraph.speedInter = std::min(allGather3Data[i].ring.speedInter, ringGraph.speedInter);
-    ringGraph.typeIntra = std::min(allGather3Data[i].ring.typeIntra, ringGraph.typeIntra);
+    comm->nChannels = std::min(allGather3Data[i].nChannels, comm->nChannels);
   }
 
   if (comm->nChannels < nChannelsOrig) {
     // We started duplicating channels during Preset(), so we need to move the
     // duplicated channels since we have removed some.
-    for (int i=0; i<comm->nChannels; i++) memcpy(comm->channels+comm->nChannels+i, comm->channels+nChannelsOrig+i, sizeof(struct ncclChannel));
+    for (int i=0; i<comm->nChannels; i++) {
+      memcpy(comm->channels + comm->nChannels + i,
+             comm->channels + nChannelsOrig + i,
+             sizeof(struct ncclChannel));
+    }
   }
 
-  int *rings;
-  NCCLCHECK(ncclCalloc(&rings, nranks*MAXCHANNELS));
-
-  NCCLCHECK(ncclTopoPostset(comm, nodesFirstRank, allTopoRanks, rings));
-
-  free(allTopoRanks);
-  free(nodesFirstRank);
   free(allGather3Data);
 
   // AllGather3 - end
 
   TRACE(NCCL_INIT, "rank %d nranks %d - BUILT %d TREES/RINGS", rank, nranks, comm->nChannels);
 
-  NCCLCHECK(ncclTopoTuneModel(comm, minCompCap, maxCompCap, &treeGraph, &ringGraph));
-
-  char line[1024];
-  line[0]='\0';
-  for (int c=0; c<comm->nChannels; c++) {
-    struct ncclTree* treeUp = &comm->channels[c].treeUp;
-    struct ncclTree* treeDn = &comm->channels[c].treeDn;
-    snprintf(line+strlen(line), 1023-strlen(line), " [%d] %d/%d/%d->%d->%d|%d->%d->%d/%d/%d",
-        c, treeUp->down[0], treeUp->down[1], treeUp->down[2], rank, treeUp->up,
-        treeDn->up, rank, treeDn->down[0], treeDn->down[1], treeDn->down[2]);
-  }
-  line[1023] = '\0';
-  INFO(NCCL_INIT, "Trees%s", line);
+  NCCLCHECK(ncclTopoTuneModel(comm, minCompCap, maxCompCap));
 
   // Set Affinity to a CPU local the our GPU, so that all memory we allocate
   // on the host is local.
@@ -494,20 +392,9 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(computeBuffSizes(comm));
 
   // Connect with prev/next for each ring
-  struct ncclConnect *connect;
-  NCCLCHECKGOTO(ncclCalloc(&connect, 2), ret, affinity_restore);
   for (int c=0; c<comm->nChannels; c++) {
-    struct ncclChannel* channel = comm->channels+c;
-    NCCLCHECKGOTO(setupChannel(comm, c, rank, nranks, rings+c*nranks), ret, affinity_restore);
-    if (comm->nRanks == 1) continue;
-    NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &ringGraph, channel, 1, &channel->ring.prev, 1, &channel->ring.next), ret, affinity_restore);
-    NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &treeGraph, channel, NCCL_MAX_TREE_ARITY, channel->treeUp.down, 1, &channel->treeUp.up), ret, affinity_restore);
-    NCCLCHECKGOTO(ncclTransportP2pSetup(comm, &treeGraph, channel, 1, &channel->treeDn.up, NCCL_MAX_TREE_ARITY, channel->treeDn.down), ret, affinity_restore);
+    NCCLCHECKGOTO(initChannel(comm, c), ret, affinity_restore);
   }
-
-  TRACE(NCCL_INIT, "rank %d nranks %d - CONNECTED %d RINGS AND TREES", rank, nranks, comm->nChannels);
-  free(connect);
-  free(rings);
 
   // Compute nChannels per peer for p2p
   NCCLCHECK(ncclTopoComputeP2pChannels(comm));
