@@ -102,25 +102,6 @@ struct ncclConnector {
   struct ncclComm *comm;
 };
 
-struct ncclRing {
-  // Shortcuts for userRanks[1] and userRanks[n-1]
-  int prev;
-  int next;
-
-  // Maps an internal nccl index to user-specified rank order. This is necessary
-  // since we need to know how the user expects data to be ordered across
-  // devices. Ordered from current device.
-  int* userRanks;
-  int* devUserRanks;
-};
-
-
-#define NCCL_MAX_TREE_ARITY 3
-struct ncclTree {
-  int depth;
-  int up;
-  int down[NCCL_MAX_TREE_ARITY];
-};
 
 struct ncclPeer {
   struct ncclConnector send;
@@ -179,12 +160,6 @@ static_assert(sizeof(struct ncclColl) == (0x10*sizeof(int)), "ncclColl must have
 struct ncclChannel {
   union {
     struct {
-      // struct ncclRing ring;
-      // struct ncclTree treeUp;
-      // struct ncclTree treeDn;
-      // struct ncclTree collTreeUp;
-      // struct ncclTree collTreeDn;
-
       int id;
 
       // Communication structures

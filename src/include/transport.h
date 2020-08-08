@@ -19,7 +19,6 @@
 extern struct ncclTransport ncclTransports[];
 
 // Forward declarations
-struct ncclRing;
 struct ncclConnector;
 struct ncclComm;
 

@@ -31,9 +31,7 @@ static int getNthreads(const char* name, int env, int min, int max, int def) {
 }
 
 ncclResult_t ncclTopoTuneModel(
-  struct ncclComm* comm,
-  int minCompCap,
-  int maxCompCap) {
+  struct ncclComm* comm) {
   int simpleDefaultThreads = NCCL_MAX_NTHREADS;
   comm->maxThreads =
     getNthreads("NCCL_NTHREADS", ncclParamNthreads(), 2*WARP_SIZE, NCCL_MAX_NTHREADS, simpleDefaultThreads);

@@ -225,11 +225,6 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, comm->p2pnChannels));
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
 
-  // Copy userRanks and peers
-  // for (int r=0; r<comm->p2pnChannels; r++) {
-  //   NCCLCHECK(ncclCudaMemcpy(comm->channels[r].ring.devUserRanks, comm->channels[r].ring.userRanks, comm->nRanks));
-  // }
-
   // Duplicate the dev comm on the device
   NCCLCHECK(ncclCudaCalloc(&comm->devComm, 1));
   NCCLCHECK(ncclCudaMemcpy(comm->devComm, &comm->hostDevComm, 1));
@@ -329,55 +324,11 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Print final topology
   NCCLCHECK(ncclTopoPrint(comm->topo));
 
-  // AllGather3 - begin
-
-  struct {
-    int cudaCompCap;
-    int fullCudaCompCap;
-    int nChannels;
-  } *allGather3Data;
-
-  NCCLCHECK(ncclCalloc(&allGather3Data, nranks));
-  allGather3Data[rank].cudaCompCap = ncclCudaCompCap();
-  allGather3Data[rank].nChannels = comm->nChannels = 2;
-
-  NCCLCHECK(bootstrapAllGather(comm->bootstrap, allGather3Data, sizeof(*allGather3Data)));
-
-  // Determine nNodes, firstRanks, ...
+  comm->nChannels = 2;
   comm->nNodes = 2;
   comm->node = rank;
 
-  // Determine the minimum CUDA Compute capability of all GPUs
-  int myCompCap = allGather3Data[rank].cudaCompCap;
-  int minCompCap = myCompCap, maxCompCap = myCompCap;
-  for (int i = 0; i < nranks; i++) {
-    minCompCap = std::min(allGather3Data[i].cudaCompCap, minCompCap);
-    maxCompCap = std::max(allGather3Data[i].cudaCompCap, maxCompCap);
-  }
-
-  int nChannelsOrig = comm->nChannels;
-  for (int i=0; i<nranks; i++) {
-    // Make sure we align all ranks so that the tuning is consistent across ranks
-    comm->nChannels = std::min(allGather3Data[i].nChannels, comm->nChannels);
-  }
-
-  if (comm->nChannels < nChannelsOrig) {
-    // We started duplicating channels during Preset(), so we need to move the
-    // duplicated channels since we have removed some.
-    for (int i=0; i<comm->nChannels; i++) {
-      memcpy(comm->channels + comm->nChannels + i,
-             comm->channels + nChannelsOrig + i,
-             sizeof(struct ncclChannel));
-    }
-  }
-
-  free(allGather3Data);
-
-  // AllGather3 - end
-
-  TRACE(NCCL_INIT, "rank %d nranks %d - BUILT %d TREES/RINGS", rank, nranks, comm->nChannels);
-
-  NCCLCHECK(ncclTopoTuneModel(comm, minCompCap, maxCompCap));
+  NCCLCHECK(ncclTopoTuneModel(comm));
 
   // Set Affinity to a CPU local the our GPU, so that all memory we allocate
   // on the host is local.
