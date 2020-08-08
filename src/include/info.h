@@ -11,15 +11,7 @@
 #include "devcomm.h"
 
 typedef enum {
-  ncclPatternRing,
-  ncclPatternRingTwice,
-  ncclPatternPipelineFrom,
-  ncclPatternPipelineTo,
-  ncclPatternTreeUp,
-  ncclPatternTreeDown,
-  ncclPatternTreeUpDown,
-  ncclPatternCollTreeUp,
-  ncclPatternCollTreeDown
+  ncclPatternRing
 } ncclPattern_t;
 
 // Used to pass NCCL call information between functions

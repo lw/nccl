@@ -137,41 +137,33 @@ ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
 
   info->comm->myParams->blockDim.x = std::max<unsigned>(info->comm->myParams->blockDim.x, info->nThreads);
 
-  int nChannels = 1;
-  int nSubChannels = (info->pattern == ncclPatternCollTreeUp || info->pattern == ncclPatternCollTreeDown) ? 2 : 1;
+  int channelId = info->channelId;
+  struct ncclChannel* channel = info->comm->channels+channelId;
 
-  for (int bid=0; bid<nChannels*nSubChannels; bid++) {
-    int channelId = info->channelId;
-    struct ncclChannel* channel = info->comm->channels+channelId;
-
-    if (channel->collCount == NCCL_MAX_OPS) {
-      WARN("Too many aggregated operations on channel %d (%d max)", channel->id, NCCL_MAX_OPS);
-      return ncclInvalidUsage;
-    }
-
-    // Proxy
-    proxyArgs.channel = channel;
-    // Adjust pattern for CollNet based on channel index
-    if (nSubChannels == 2) {
-      info->pattern = (channelId < info->comm->nChannels/nSubChannels) ? ncclPatternCollTreeUp : ncclPatternCollTreeDown;
-    }
-
-    info->comm->myParams->gridDim.x = std::max<unsigned>(info->comm->myParams->gridDim.x, channelId+1);
-    NCCLCHECK(ncclProxySaveP2p(info, channel));
-    info->comm->myParams->gridDim.x++;
-    int opIndex = channel->collFifoTail;
-    struct ncclColl* c = channel->collectives+opIndex;
-    volatile uint8_t* activePtr = (volatile uint8_t*)&c->active;
-    while (activePtr[0] != 0) sched_yield();
-
-    memcpy(c, &coll, sizeof(struct ncclColl));
-
-    c->active = 1;
-    opIndex = (opIndex+1)%NCCL_MAX_OPS;
-    c->nextIndex = opIndex;
-    channel->collFifoTail = opIndex;
-    channel->collCount++;
+  if (channel->collCount == NCCL_MAX_OPS) {
+    WARN("Too many aggregated operations on channel %d (%d max)", channel->id, NCCL_MAX_OPS);
+    return ncclInvalidUsage;
   }
+
+  // Proxy
+  proxyArgs.channel = channel;
+
+  info->comm->myParams->gridDim.x = std::max<unsigned>(info->comm->myParams->gridDim.x, channelId+1);
+  NCCLCHECK(ncclProxySaveP2p(info, channel));
+  info->comm->myParams->gridDim.x++;
+  int opIndex = channel->collFifoTail;
+  struct ncclColl* c = channel->collectives+opIndex;
+  volatile uint8_t* activePtr = (volatile uint8_t*)&c->active;
+  while (activePtr[0] != 0) sched_yield();
+
+  memcpy(c, &coll, sizeof(struct ncclColl));
+
+  c->active = 1;
+  opIndex = (opIndex+1)%NCCL_MAX_OPS;
+  c->nextIndex = opIndex;
+  channel->collFifoTail = opIndex;
+  channel->collCount++;
+
   info->comm->opCount++;
   return ncclSuccess;
 }
