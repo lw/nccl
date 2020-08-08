@@ -159,13 +159,7 @@ static ncclResult_t commFree(ncclComm_t comm) {
   if (comm->doneEvent != NULL)
     CUDACHECK(cudaEventDestroy(comm->doneEvent));
 
-  // Last rank frees shared resources between threads
-  int isLast = 1;
-  if (isLast) {
-    free(comm->intraBarrier);
-    free(comm->intraParams);
-    free(comm->intraCudaDevs);
-  }
+  free(comm->myParams);
   CUDACHECK(cudaFreeHost((void *)comm->abortFlag));
   CUDACHECK(cudaFreeHost((void *)comm->fatalDevError));
 
@@ -246,14 +240,6 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
   info->rank = comm->rank;
   CUDACHECK(cudaGetDevice(&info->cudaDev));
   info->hostHash=getHostHash()+commHash;
-  info->pidHash=getPidHash()+commHash;
-
-  // Get the device MAJOR:MINOR of /dev/shm so we can use that
-  // information to decide whether we can use SHM for inter-process
-  // communication in a container environment
-  struct stat statbuf;
-  SYSCHECK(stat("/dev/shm", &statbuf), "stat");
-  info->shmDev = statbuf.st_dev;
 
   info->busId = comm->busId;
 
@@ -286,38 +272,12 @@ void* waitForNonNullPtr(void* p) {
 }
 
 ncclResult_t initParams(struct ncclComm* comm) {
-  struct cudaLaunchParams* params = comm->myParams = comm->intraParams+comm->intraRank;
+  struct cudaLaunchParams* params = comm->myParams;
   params->args = &comm->argsptr;
   params->stream = NULL;
   params->sharedMem = 0;
   params->blockDim.x = 0; params->blockDim.y = params->blockDim.z = 1;
   params->gridDim.x = 0; params->gridDim.y = params->gridDim.z = 1;
-  return ncclSuccess;
-}
-
-// Allocate/Set Intra Process Structures and set CG options
-ncclResult_t ncclCommSetIntra(struct ncclComm* comm, int rank, int ranks, struct ncclComm* comm0) {
-  comm->intraRank = rank;
-  comm->intraRanks = ranks;
-  comm->intraPhase = 0;
-
-  // Alloc shared structures
-  if (rank == 0) {
-    assert(comm == comm0);
-    int* bar;
-    NCCLCHECK(ncclCalloc(&bar, 2));
-    bar[0] = bar[1] = 0;
-    comm->intraBarrier = bar;
-    NCCLCHECK(ncclCalloc(&comm->intraParams, comm->intraRanks));
-    NCCLCHECK(ncclCalloc(&comm->intraCudaDevs, comm->intraRanks));
-  } else {
-    comm->intraBarrier = (int*)waitForNonNullPtr(&comm0->intraBarrier);
-    comm->intraParams = (struct cudaLaunchParams*)waitForNonNullPtr(&comm0->intraParams);
-    comm->intraCudaDevs = (int*)waitForNonNullPtr(&comm0->intraCudaDevs);
-  }
-  comm->intraCudaDevs[comm->intraRank] = comm->cudaDev;
-  NCCLCHECK(initParams(comm));
-
   return ncclSuccess;
 }
 
@@ -374,12 +334,11 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(ncclCalloc(&comm->peerInfo, nranks));
   for (int i = 0; i < nranks; i++) {
     memcpy(comm->peerInfo+i, &allGather1Data[i].peerInfo, sizeof(struct ncclPeerInfo));
-    if ((i != rank) && (comm->peerInfo[i].hostHash == myInfo->hostHash) && (comm->peerInfo[i].busId == myInfo->busId)) {
-      WARN("Duplicate GPU detected : rank %d and rank %d both on CUDA device %x", rank, i, myInfo->busId);
-      return ncclInvalidUsage;
-    }
   }
-  // AllGather1 data is used again below
+
+  // Done with AllGather1 data
+  free(allGather1Data);
+
   // AllGather1 - end
 
   // Topo detection / System graph creation
@@ -559,27 +518,8 @@ affinity_restore:
   sched_setaffinity(0, sizeof(cpu_set_t), &affinitySave);
   if (ret != ncclSuccess) return ret;
 
-  // Compute intra ranks (using AllGather1 data)
-  int intraRank0 = -1, intraRank = -1, intraRanks = 0;
-  for (int i = 0; i < nranks; i++) {
-    if ((allGather1Data[i].peerInfo.hostHash == allGather1Data[rank].peerInfo.hostHash) &&
-        (allGather1Data[i].peerInfo.pidHash == allGather1Data[rank].peerInfo.pidHash)) {
-      if (intraRanks == 0) intraRank0 = i;
-      if (i == rank) intraRank = intraRanks;
-      intraRanks++;
-    }
-  }
-  TRACE(NCCL_INIT,"hostHash[%d] %lx intraRank %d intraRanks %d intraRank0 %d",
-        rank, allGather1Data[rank].peerInfo.hostHash, intraRank, intraRanks, intraRank0);
-  if (intraRank == -1 || intraRank0 == -1 || allGather1Data[intraRank0].comm == NULL) {
-    WARN("Failed to determine intra ranks hostHash[%d] %lx intraRank %d intraRanks %d intraRank0 %d",
-         rank, allGather1Data[rank].peerInfo.hostHash, intraRank, intraRanks, intraRank0);
-    return ncclInternalError;
-  }
-  NCCLCHECK(ncclCommSetIntra(comm, intraRank, intraRanks, allGather1Data[intraRank0].comm));
-
-  // Done with AllGather1 data
-  free(allGather1Data);
+  NCCLCHECK(ncclCalloc(&comm->myParams, 1));
+  NCCLCHECK(initParams(comm));
 
   if (comm->nNodes) NCCLCHECK(ncclProxyCreate(comm));
 

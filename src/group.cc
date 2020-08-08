@@ -206,9 +206,8 @@ ncclResult_t ncclGroupEnd() {
           // Compute how much to split operations
           // Natural step size matching buffer steps.
           ssize_t stepSize = 4*comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
-          // Split each operation on p2pnChannelsPerPeer max.
-          ssize_t recvChunkSize = DIVUP(p2plist->peerlist[from].recvbytes, comm->p2pnChannelsPerPeer);
-          ssize_t sendChunkSize = DIVUP(p2plist->peerlist[to].sendbytes, comm->p2pnChannelsPerPeer);
+          ssize_t recvChunkSize = p2plist->peerlist[from].recvbytes;
+          ssize_t sendChunkSize = p2plist->peerlist[to].sendbytes;
           recvChunkSize = std::max((ssize_t)1, DIVUP(recvChunkSize, stepSize)) * stepSize;
           sendChunkSize = std::max((ssize_t)1, DIVUP(sendChunkSize, stepSize)) * stepSize;
 

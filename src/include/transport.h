@@ -28,8 +28,6 @@ struct ncclPeerInfo {
   int cudaDev;
   int gdrSupport;
   uint64_t hostHash;
-  uint64_t pidHash;
-  dev_t shmDev;
   int64_t busId;
 };
 

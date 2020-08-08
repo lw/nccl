@@ -89,7 +89,6 @@ struct ncclComm {
   int nChannels;
   // Channels (per peer) for p2p
   int p2pnChannels;
-  int p2pnChannelsPerPeer;
 
   // Buffer sizes
   int buffSizes[NCCL_NUM_PROTOCOLS];
@@ -111,16 +110,8 @@ struct ncclComm {
   // Host copy of the devComm (to free CUDA allocs)
   struct ncclDevComm hostDevComm;
 
-  // Intra-process sync
-  int intraRank;
-  int intraRanks;
-  int* intraBarrier;
-  int intraPhase;
-
   // Storage for deferred intra-process launch
-  struct cudaLaunchParams * intraParams;
   struct cudaLaunchParams *myParams;
-  int* intraCudaDevs;
   struct ncclColl args;
   void* argsptr;
 
