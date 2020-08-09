@@ -203,11 +203,10 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   }
   NCCLCHECKGOTO(ArgsCheck(info), ret, end);
   NCCLCHECKGOTO(checkSetStream(info), ret, end);
-
-  NCCLCHECKGOTO(ncclSaveP2p(info), ret, end);
 end:
   if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
 
+  NCCLCHECK(ncclSaveP2p(info));
   NCCLCHECK(ncclGroupEnd(info->comm));
 
   return ret;

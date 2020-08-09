@@ -53,41 +53,15 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
       uint32_t from = (rank+nRanks-delta)%nRanks;
       uint32_t to = (rank+delta)%nRanks;
 
-      // Compute how much to split operations
-      // Natural step size matching buffer steps.
-      ssize_t stepSize = 4*comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
-      ssize_t recvChunkSize = p2plist->peerlist[from].recvbytes;
-      ssize_t sendChunkSize = p2plist->peerlist[to].sendbytes;
-      // Round up to nearest multiple of stepSize; if 0 make it stepSize.
-      recvChunkSize = std::max((ssize_t)1, DIVUP(recvChunkSize, stepSize)) * stepSize;
-      sendChunkSize = std::max((ssize_t)1, DIVUP(sendChunkSize, stepSize)) * stepSize;
-
-      ssize_t sendOffset = 0;
-      ssize_t recvOffset = 0;
-      int remaining = 1;
-      while (remaining) {
-        remaining = 0;
-        ssize_t recvbytes = p2plist->peerlist[from].recvbytes-recvOffset;
-        ssize_t sendbytes = p2plist->peerlist[to].sendbytes-sendOffset;
-        if (recvbytes > recvChunkSize) {
-          remaining = 1;
-          recvbytes = recvChunkSize;
-        } else {
-          p2plist->peerlist[from].recvbytes = -1;
-        }
-        if (sendbytes > sendChunkSize) {
-          remaining = 1;
-          sendbytes = sendChunkSize;
-        } else {
-          p2plist->peerlist[to].sendbytes = -1;
-        }
-        if (sendbytes >= 0 || recvbytes >= 0) {
-          NCCLCHECKGOTO(scheduleSendRecv(comm, delta,
-                recvbytes, ((char*)(p2plist->peerlist[from].recvbuff)) + recvOffset,
-                sendbytes, ((const char*)(p2plist->peerlist[to].sendbuff)) + sendOffset), ret, end);
-        }
-        recvOffset += recvChunkSize;
-        sendOffset += sendChunkSize;
+      ssize_t recvbytes = p2plist->peerlist[from].recvbytes;
+      ssize_t sendbytes = p2plist->peerlist[to].sendbytes;
+      p2plist->peerlist[from].recvbytes = -1;
+      p2plist->peerlist[to].sendbytes = -1;
+      if (sendbytes >= 0 || recvbytes >= 0) {
+        NCCLCHECKGOTO(scheduleSendRecv(comm, delta,
+              recvbytes, (char*)(p2plist->peerlist[from].recvbuff),
+              sendbytes, (const char*)(p2plist->peerlist[to].sendbuff)),
+          ret, end);
       }
     }
     p2plist->count = 0;
