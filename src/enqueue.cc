@@ -169,29 +169,6 @@ ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
   return ncclSuccess;
 }
 
-// Save p2p operations in comm->p2plist. Operations will be posted to channels
-// during ncclGroupEnd()
-ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
-  struct ncclComm* comm = info->comm;
-  struct ncclP2Plist* p2plist = &comm->p2plist;
-  int peer = info->root;
-  p2plist->count++;
-  if (info->recvbuff == NULL) {
-    if (peer != comm->rank) {
-      assert(comm->channel.peers[peer].send.connected);
-    }
-    p2plist->peerlist[peer].sendbytes = info->length;
-    p2plist->peerlist[peer].sendbuff = info->sendbuff;
-  } else {
-    if (peer != comm->rank) {
-      assert(comm->channel.peers[peer].recv.connected);
-    }
-    p2plist->peerlist[peer].recvbytes = info->length;
-    p2plist->peerlist[peer].recvbuff = info->recvbuff;
-  }
-  return ncclSuccess;
-}
-
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   ncclResult_t ret = ncclSuccess;
   int savedDev = -1;
@@ -206,7 +183,31 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
 end:
   if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
 
-  NCCLCHECK(ncclSaveP2p(info));
+  struct ncclComm* comm = info->comm;
+  int rank = comm->rank;
+  int nRanks = comm->nRanks;
+  int peer = info->root;
+
+  struct ncclInfo info2 = { ncclCollSendRecv, "SendRecv",
+    info->sendbuff, info->recvbuff, info->length, ncclSum, -1, comm, comm->userStream, /* Args */
+    1, 1 };
+
+  if (info->recvbuff == NULL) {
+    if (peer != rank) {
+      assert(comm->channel.peers[peer].send.connected);
+    }
+    info2.delta = (peer - rank + nRanks) % nRanks;
+    info2.sendbytes = info->length;
+  } else {
+    if (peer != comm->rank) {
+      assert(comm->channel.peers[peer].recv.connected);
+    }
+    info2.delta = (rank - peer + nRanks) % nRanks;
+    info2.recvbytes = info->length;
+  }
+
+  NCCLCHECK(ncclSaveKernel(&info2));
+
   NCCLCHECK(ncclGroupEnd(info->comm));
 
   return ret;

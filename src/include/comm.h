@@ -113,9 +113,6 @@ struct ncclComm {
   // Global proxy thread
   pthread_t proxyThread;
   struct ncclProxyState proxyState;
-
-  //list of async p2p operation queued in a group semantics
-  struct ncclP2Plist p2plist;
 };
 
 #endif
