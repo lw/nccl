@@ -45,7 +45,6 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
   CUDACHECK(cudaGetDevice(&savedDev));
   ncclResult_t ret = ncclSuccess;
 
-  {
   int rank = comm->rank;
   int nRanks = comm->nRanks;
   struct ncclP2Plist* p2plist = &comm->p2plist;
@@ -84,7 +83,6 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
     }
     p2plist->count = 0;
   }
-  }
 
   /* Collectives are done in three steps :
    * 1. Barrier Check In. Only the last call may call cudaLaunchKernel[cooperative]
@@ -109,39 +107,6 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
   }
   NCCLCHECKGOTO(ncclEnqueueEvents(comm), ret, end);
 
-  goto end;
-
-  if (ret != ncclSuccess) {
-    // At least one call in the group failed. Since we want to make that group
-    // an atomic operation, we need to cancel all operations.
-    struct ncclChannel* channel = &comm->channel;
-    for (int i=0; i<channel->collCount; i++) {
-      channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
-    }
-    channel->collFifoTail = channel->collStart;
-    channel->collCount = 0;
-    /* Cancel all proxy ops : mark them as ncclProxyOpNone and they should be freed later on */
-    struct ncclProxyState* state = &comm->proxyState;
-    struct ncclProxyArgs *op, *start;
-    pthread_mutex_lock(&state->mutex);
-    op = start = state->ops;
-    while (op) {
-      if (op->opCount >= comm->lastOpCount) op->state = ncclProxyOpNone;
-      struct ncclProxyArgs* peerOp = op->nextPeer;
-      while (peerOp) {
-        if (peerOp->opCount >= comm->lastOpCount) peerOp->state = ncclProxyOpNone;
-        peerOp = peerOp->nextPeer;
-      }
-      op = op->next;
-      if (op == start) break;
-    }
-    comm->opCount = comm->lastOpCount;
-    pthread_cond_signal(&state->cond);
-    pthread_mutex_unlock(&state->mutex);
-
-    comm->myParams->gridDim.x = comm->myParams->blockDim.x = 0;
-    comm->userStreamSet = false;
-  }
 end:
   CUDACHECK(cudaSetDevice(savedDev)); // do other clean-ups first before calling cudaSetDevice, because this call can fail too
   return ret;
