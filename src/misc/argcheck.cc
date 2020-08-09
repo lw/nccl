@@ -39,8 +39,6 @@ ncclResult_t ArgsCheck(struct ncclInfo* info) {
     WARN("%s : invalid root %d (root should be in the 0..%d range)", info->opName, info->root, info->comm->nRanks);
     return ncclInvalidArgument;
   }
-  // Type is OK, compute nbytes. Convert Allgather/Broadcast/P2P calls to chars.
-  info->nBytes = info->length;
 
   if (info->op < 0 || info->op >= ncclNumOps) {
     WARN("%s : invalid reduction operation %d", info->opName, info->op);
