@@ -17,8 +17,8 @@ struct ncclP2Pinfo {
 };
 
 struct ncclP2PConnect {
-  int nrecv[MAXCHANNELS];
-  int nsend[MAXCHANNELS];
+  int nrecv;
+  int nsend;
   int* recv;
   int* send;
 };

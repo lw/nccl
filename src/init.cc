@@ -210,8 +210,8 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   comm->p2plist.count=0;
   NCCLCHECK(ncclCalloc(&comm->p2plist.peerlist, comm->nRanks));
   for (int r=0; r<comm->nRanks; r++) comm->p2plist.peerlist[r].sendbytes = comm->p2plist.peerlist[r].recvbytes = -1;
-  NCCLCHECK(ncclCalloc(&comm->p2plist.connect.recv, MAXCHANNELS*comm->nRanks));
-  NCCLCHECK(ncclCalloc(&comm->p2plist.connect.send, MAXCHANNELS*comm->nRanks));
+  NCCLCHECK(ncclCalloc(&comm->p2plist.connect.recv, MAXCHANNELS*comm->nRanks)); // FIXME
+  NCCLCHECK(ncclCalloc(&comm->p2plist.connect.send, MAXCHANNELS*comm->nRanks)); // FIXME
 
   // Mark channels as non initialized.
   for (int c=0; c<MAXCHANNELS; c++) comm->channels[c].id = -1;
@@ -222,8 +222,8 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
 
 static ncclResult_t devCommSetup(ncclComm_t comm) {
   // Duplicate the channels on the device
-  NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, comm->p2pnChannels));
-  NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
+  NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, 1));
+  NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, 1));
 
   // Duplicate the dev comm on the device
   NCCLCHECK(ncclCudaCalloc(&comm->devComm, 1));
@@ -324,7 +324,7 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Print final topology
   NCCLCHECK(ncclTopoPrint(comm->topo));
 
-  comm->nChannels = 2;
+  comm->nChannels = 1;
   comm->nNodes = 2;
   comm->node = rank;
 
@@ -339,13 +339,7 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   NCCLCHECK(computeBuffSizes(comm));
 
-  // Connect with prev/next for each ring
-  for (int c=0; c<comm->nChannels; c++) {
-    NCCLCHECKGOTO(initChannel(comm, c), ret, affinity_restore);
-  }
-
-  // Compute nChannels per peer for p2p
-  NCCLCHECK(ncclTopoComputeP2pChannels(comm));
+  NCCLCHECKGOTO(initChannel(comm, 0), ret, affinity_restore);
 
   // We should have allocated all buffers, collective fifos, ... we can
   // restore the affinity.

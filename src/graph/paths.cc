@@ -445,28 +445,3 @@ void ncclTopoFree(struct ncclTopoSystem* system) {
   for (int t=0; t<NCCL_TOPO_NODE_TYPES; t++) ncclTopoRemovePathType(system, t);
   free(system);
 }
-
-NCCL_PARAM(MinP2pNChannels, "MIN_P2P_NCHANNELS", 1);
-NCCL_PARAM(MaxP2pNChannels, "MAX_P2P_NCHANNELS", MAXCHANNELS);
-
-static int nextPow2(int v) {
-  int pow2 = 1;
-  while (pow2 < v) pow2 <<= 1;
-  return pow2;
-}
-
-ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm) {
-  comm->p2pnChannels = std::min(comm->nChannels, (int)ncclParamMaxP2pNChannels());
-  comm->p2pnChannels = std::max(comm->p2pnChannels, (int)ncclParamMinP2pNChannels());
-
-  // Round to next pow2 nChannelsPerPeer and nChannels
-  comm->p2pnChannels = nextPow2(comm->p2pnChannels);
-
-  // Init channels that weren't used so far
-  for (int c=comm->nChannels; c<comm->p2pnChannels; c++) {
-    NCCLCHECK(initChannel(comm, c));
-  }
-
-  INFO(NCCL_INIT, "%d coll channels, %d p2p channels, 1 p2p channels per peer", comm->nChannels, comm->p2pnChannels);
-  return ncclSuccess;
-}

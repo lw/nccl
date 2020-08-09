@@ -19,8 +19,8 @@ static void* const ncclKerns[1] = {
 
 ncclResult_t setupLaunch(struct ncclComm* comm, struct cudaLaunchParams* params) {
   // Only launch blocks where we have work to do.
-  for (int c=0; c<comm->p2pnChannels; c++) {
-    if (comm->channels[c].collCount) params->gridDim.x = c+1;
+  if (comm->channels[0].collCount) {
+    params->gridDim.x = 1;
   }
 
   // Set active = 2 for the last operation and add a no-op on empty channels (p2p case).
@@ -178,21 +178,17 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
   ssize_t nBytes = info->count*ncclTypeSize(info->datatype);
   if (info->recvbuff == NULL) {
     if (peer != comm->rank) {
-      int delta = (comm->nRanks - (comm->rank-peer)) % comm->nRanks;
-        int channelId = delta % comm->p2pnChannels;
-        if (comm->channels[channelId].peers[peer].send.connected == 0) {
-          p2plist->connect.send[channelId*comm->nRanks+p2plist->connect.nsend[channelId]++] = peer;
-        }
+      if (comm->channels[0].peers[peer].send.connected == 0) {
+        p2plist->connect.send[p2plist->connect.nsend++] = peer;
+      }
     }
     p2plist->peerlist[info->root].sendbytes = nBytes;
     p2plist->peerlist[info->root].sendbuff = info->sendbuff;
   } else {
     if (peer != comm->rank) {
-      int delta = (comm->nRanks + (comm->rank-peer)) % comm->nRanks;
-        int channelId = delta % comm->p2pnChannels;
-        if (comm->channels[channelId].peers[peer].recv.connected == 0) {
-          p2plist->connect.recv[channelId*comm->nRanks+p2plist->connect.nrecv[channelId]++] = peer;
-        }
+      if (comm->channels[0].peers[peer].recv.connected == 0) {
+        p2plist->connect.recv[p2plist->connect.nrecv++] = peer;
+      }
     }
     p2plist->peerlist[info->root].recvbytes = nBytes;
     p2plist->peerlist[info->root].recvbuff = info->recvbuff;

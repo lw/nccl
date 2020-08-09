@@ -115,14 +115,16 @@ static ncclResult_t scheduleSendRecv(struct ncclComm* comm, int delta, int chann
 void* ncclAsyncThreadPreconnect(void* args_) {
   struct ncclAsyncArgs* args = (struct ncclAsyncArgs*)args_;
   CUDACHECKTHREAD(cudaSetDevice(args->coll.comm->cudaDev));
-  for (int c=0; c<args->coll.comm->p2pnChannels; c++) {
-    struct ncclComm* comm = args->coll.comm;
-    struct ncclChannel* channel = comm->channels+c;
-    struct ncclP2PConnect* connect = &comm->p2plist.connect;
-    NCCLCHECKTHREAD(ncclTransportP2pSetup(comm, NULL, channel, connect->nrecv[c], connect->recv+c*comm->nRanks, connect->nsend[c], connect->send+c*comm->nRanks));
-    connect->nrecv[c] = 0;
-    connect->nsend[c] = 0;
-  }
+  struct ncclComm* comm = args->coll.comm;
+  struct ncclChannel* channel = comm->channels+0;
+  struct ncclP2PConnect* connect = &comm->p2plist.connect;
+  NCCLCHECKTHREAD(ncclTransportP2pSetup(
+    comm, NULL, channel,
+    connect->nrecv, connect->recv,
+    connect->nsend, connect->send
+  ));
+  connect->nrecv = 0;
+  connect->nsend = 0;
   return args;
 }
 
@@ -169,9 +171,7 @@ ncclResult_t ncclGroupEnd() {
       struct ncclP2Plist* p2plist = &args->coll.comm->p2plist;
       if (p2plist->count != 0) {
         struct ncclComm* comm = args->coll.comm;
-        args->coll.connect = 0;
-        for (int c=0; c<comm->p2pnChannels; c++)
-          args->coll.connect += comm->p2plist.connect.nsend[c] + comm->p2plist.connect.nrecv[c];
+        args->coll.connect = comm->p2plist.connect.nsend + comm->p2plist.connect.nrecv;
         if (args->coll.connect) {
           pthread_create(ncclGroupThreads+i, NULL, ncclAsyncThreadPreconnect, args);
         }
@@ -216,14 +216,13 @@ ncclResult_t ncclGroupEnd() {
           int remaining = 1;
           int chunk = 0;
           while (remaining) {
-            int channelId = delta % comm->p2pnChannels;
             remaining = 0;
             ssize_t recvbytes = p2plist->peerlist[from].recvbytes-recvOffset;
             ssize_t sendbytes = p2plist->peerlist[to].sendbytes-sendOffset;
             if (recvbytes > recvChunkSize) { remaining = 1; recvbytes = recvChunkSize; } else p2plist->peerlist[from].recvbytes = -1;
             if (sendbytes > sendChunkSize) { remaining = 1; sendbytes = sendChunkSize; } else p2plist->peerlist[to].sendbytes = -1;
             if (sendbytes >= 0 || recvbytes >= 0) {
-              NCCLCHECKGOTO(scheduleSendRecv(comm, delta, channelId,
+              NCCLCHECKGOTO(scheduleSendRecv(comm, delta, /*channelId=*/0,
                     recvbytes, ((char*)(p2plist->peerlist[from].recvbuff)) + recvOffset,
                     sendbytes, ((const char*)(p2plist->peerlist[to].sendbuff)) + sendOffset), ret, end);
             }
@@ -282,14 +281,12 @@ group_cleanup:
         *args->init.newcomm = NULL;
       } else {
         struct ncclComm* comm = args->coll.comm;
-        for (int c=0; c<comm->p2pnChannels; c++) {
-          struct ncclChannel* channel = comm->channels+c;
-          for (int i=0; i<channel->collCount; i++) {
-            channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
-          }
-          channel->collFifoTail = channel->collStart;
-          channel->collCount = 0;
+        struct ncclChannel* channel = comm->channels;
+        for (int i=0; i<channel->collCount; i++) {
+          channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
         }
+        channel->collFifoTail = channel->collStart;
+        channel->collCount = 0;
         /* Cancel all proxy ops : mark them as ncclProxyOpNone and they should be freed later on */
         struct ncclProxyState* state = &comm->proxyState;
         struct ncclProxyArgs *op, *start;

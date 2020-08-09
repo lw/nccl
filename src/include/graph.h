@@ -25,7 +25,6 @@ ncclResult_t ncclTopoPrint(struct ncclTopoSystem* system);
 ncclResult_t ncclTopoComputePaths(struct ncclTopoSystem* system, struct ncclPeerInfo* info);
 void ncclTopoFree(struct ncclTopoSystem* system);
 ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* comm);
-ncclResult_t ncclTopoComputeP2pChannels(struct ncclComm* comm);
 
 // Query topology
 ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, struct ncclTopoGraph* graph, int channelId, int* net);
