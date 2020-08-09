@@ -9,7 +9,7 @@ include ../makefiles/version.mk
 
 ##### src files
 INCEXPORTS  := nccl.h nccl_net.h
-LIBSRCFILES := init.cc channel.cc bootstrap.cc transport.cc enqueue.cc group.cc debug.cc proxy.cc \
+LIBSRCFILES := init.cc channel.cc bootstrap.cc transport.cc enqueue.cc debug.cc proxy.cc \
                 misc/nvmlwrap.cc misc/ibvwrap.cc misc/utils.cc misc/argcheck.cc \
 		        transport/net.cc transport/net_socket.cc transport/net_ib.cc \
                 collectives/sendrecv.cc \

@@ -208,7 +208,19 @@ end:
 
   NCCLCHECK(ncclSaveKernel(&info2));
 
-  NCCLCHECK(ncclGroupEnd(info->comm));
+  if (comm->userStream == NULL) {
+    CUDACHECKGOTO(cudaSetDevice(comm->cudaDev), ret, end);
+  }
+  NCCLCHECKGOTO(ncclBarrierEnqueue(comm), ret, end);
+
+  CUDACHECKGOTO(cudaSetDevice(comm->cudaDev), ret, end);
+  NCCLCHECKGOTO(ncclBarrierEnqueueWait(comm), ret, end);
+
+  if (comm->userStream == NULL) {
+    CUDACHECKGOTO(cudaSetDevice(comm->cudaDev), ret, end);
+  }
+  NCCLCHECKGOTO(ncclEnqueueEvents(comm), ret, end);
+
 
   return ret;
 }
