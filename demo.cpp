@@ -73,6 +73,8 @@ int main(int argc, char* argv[])
 
     NCCLCHECK(ncclCommInitRank(&comm, world_size, id, rank));
 
+    ncclTransportP2pSetup(comm, rank ^ 1);
+
     if (rank == 0) {
       NCCLCHECK(ncclSend((const void*)sendbuff, size, ncclFloat, rank ^ 1, comm, s));
     } else {

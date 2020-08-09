@@ -108,6 +108,8 @@ typedef enum { ncclInt8       = 0, ncclChar       = 0,
                ncclFloat64    = 8, ncclDouble     = 8,
                ncclNumTypes   = 9 } ncclDataType_t;
 
+ncclResult_t ncclTransportP2pSetup(ncclComm_t comm, int peer);
+
 /*
  * Collective communication operations
  *

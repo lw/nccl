@@ -41,7 +41,6 @@ struct ncclInfo {
   ssize_t sendbytes;
   ssize_t recvbytes;
   uint32_t delta;
-  int channelId;
 };
 
 #endif

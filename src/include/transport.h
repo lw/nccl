@@ -49,6 +49,4 @@ struct ncclTransport {
   struct ncclTransportComm recv;
 };
 
-ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend);
-
 #endif

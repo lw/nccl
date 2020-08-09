@@ -94,10 +94,6 @@ static ncclResult_t SaveProxy(int peer, struct ncclProxyArgs* args) {
   return ncclSuccess;
 }
 
-ncclResult_t ncclProxySaveColl(struct ncclProxyArgs* args, int pattern, int root, int nranks) {
-  return ncclSuccess;
-}
-
 ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel) {
   struct ncclProxyArgs args;
   memset(&args, 0, sizeof(struct ncclProxyArgs));

@@ -39,8 +39,7 @@ struct ncclCollArgs {
 
 enum ncclAsyncFuncType {
   ASYNC_FUNC_INVALID = 0,
-  ASYNC_FUNC_INIT = 1,
-  ASYNC_FUNC_COLL = 2,
+  ASYNC_FUNC_COLL = 1,
 };
 struct ncclAsyncArgs {
   ncclResult_t ret;
@@ -99,33 +98,16 @@ ncclResult_t ncclGroupStart() {
   return ncclSuccess;
 }
 
-static ncclResult_t scheduleSendRecv(struct ncclComm* comm, int delta, int channelId, ssize_t recvbytes, void* recvbuff, ssize_t sendbytes, const void* sendbuff) {
+static ncclResult_t scheduleSendRecv(struct ncclComm* comm, int delta, ssize_t recvbytes, void* recvbuff, ssize_t sendbytes, const void* sendbuff) {
   struct ncclInfo info = { ncclCollSendRecv, "SendRecv",
     sendbuff, recvbuff, (size_t)std::max<ssize_t>(sendbytes,recvbytes), ncclInt8, ncclSum, -1, comm, comm->userStream, /* Args */
     1, 1 };
   info.delta = delta;
-  info.channelId = channelId;
   info.sendbytes = sendbytes;
   info.recvbytes = recvbytes;
   if (delta == 0 && sendbytes != recvbytes) return ncclInvalidUsage;
   NCCLCHECK(ncclSaveKernel(&info));
   return ncclSuccess;
-}
-
-void* ncclAsyncThreadPreconnect(void* args_) {
-  struct ncclAsyncArgs* args = (struct ncclAsyncArgs*)args_;
-  CUDACHECKTHREAD(cudaSetDevice(args->coll.comm->cudaDev));
-  struct ncclComm* comm = args->coll.comm;
-  struct ncclChannel* channel = &comm->channel;
-  struct ncclP2PConnect* connect = &comm->p2plist.connect;
-  NCCLCHECKTHREAD(ncclTransportP2pSetup(
-    comm, channel,
-    connect->nrecv, connect->recv,
-    connect->nsend, connect->send
-  ));
-  connect->nrecv = 0;
-  connect->nsend = 0;
-  return args;
 }
 
 NCCL_API(ncclResult_t, ncclGroupEnd);
@@ -135,61 +117,8 @@ ncclResult_t ncclGroupEnd() {
   if (ncclGroupMode > 0) return ncclSuccess;
   int savedDev;
   CUDACHECK(cudaGetDevice(&savedDev));
-  int activeThreads = 0;
-  int doneArray[MAX_ASYNC_OPS];
-  for (int i=0; i<ncclGroupIndex; i++) doneArray[i] = 1;
   ncclResult_t ret = ncclGroupError;
   if (ret != ncclSuccess) goto group_cleanup;
-
-  /* Launch async ncclCommInitRank */
-  for (int i=0; i<ncclGroupIndex; i++) {
-    struct ncclAsyncArgs* args = ncclGroupArgs+i;
-    if (args->funcType == ASYNC_FUNC_INIT) {
-      pthread_create(ncclGroupThreads+i, NULL, ncclAsyncThreadMain, args);
-      activeThreads++;
-      doneArray[i] = 0;
-    }
-  }
-  /* For init, since we use threads, we just wait for threads to complete */
-  while (activeThreads) {
-    for (int i=0; i<ncclGroupIndex; i++) {
-      struct ncclAsyncArgs* args = ncclGroupArgs+i;
-      if (args->funcType == ASYNC_FUNC_INIT && doneArray[i] == 0) {
-        int err = pthread_tryjoin_np(ncclGroupThreads[i], NULL);
-        if (err == EBUSY) continue;
-        if (err != 0) ret = ncclSystemError;
-        if (args->ret != ncclSuccess) ret = args->ret;
-        doneArray[i] = 1;
-        activeThreads--;
-      }
-    }
-  }
-
-  for (int i=0; i<ncclGroupIndex; i++) {
-    struct ncclAsyncArgs* args = ncclGroupArgs+i;
-    if (args->funcType == ASYNC_FUNC_COLL) {
-      struct ncclP2Plist* p2plist = &args->coll.comm->p2plist;
-      if (p2plist->count != 0) {
-        struct ncclComm* comm = args->coll.comm;
-        args->coll.connect = comm->p2plist.connect.nsend + comm->p2plist.connect.nrecv;
-        if (args->coll.connect) {
-          pthread_create(ncclGroupThreads+i, NULL, ncclAsyncThreadPreconnect, args);
-        }
-      }
-    }
-  }
-
-  for (int i=0; i<ncclGroupIndex; i++) {
-    struct ncclAsyncArgs* args = ncclGroupArgs+i;
-    if (args->funcType == ASYNC_FUNC_COLL && (args->coll.connect)) {
-      int err = pthread_join(ncclGroupThreads[i], NULL);
-      if (err != 0) {
-        WARN("Error waiting for pthread_join : %s\n", strerror(errno));
-        return ncclSystemError;
-      }
-      NCCLCHECKGOTO(args->ret, ret, end);
-    }
-  }
 
   for (int i=0; i<ncclGroupIndex; i++) {
     struct ncclAsyncArgs* args = ncclGroupArgs+i;
@@ -222,7 +151,7 @@ ncclResult_t ncclGroupEnd() {
             if (recvbytes > recvChunkSize) { remaining = 1; recvbytes = recvChunkSize; } else p2plist->peerlist[from].recvbytes = -1;
             if (sendbytes > sendChunkSize) { remaining = 1; sendbytes = sendChunkSize; } else p2plist->peerlist[to].sendbytes = -1;
             if (sendbytes >= 0 || recvbytes >= 0) {
-              NCCLCHECKGOTO(scheduleSendRecv(comm, delta, /*channelId=*/0,
+              NCCLCHECKGOTO(scheduleSendRecv(comm, delta,
                     recvbytes, ((char*)(p2plist->peerlist[from].recvbuff)) + recvOffset,
                     sendbytes, ((const char*)(p2plist->peerlist[to].sendbuff)) + sendOffset), ret, end);
             }
@@ -276,39 +205,34 @@ group_cleanup:
     // an atomic operation, we need to cancel all operations.
     for (int i=0; i<ncclGroupIndex; i++) {
       struct ncclAsyncArgs* args = ncclGroupArgs+i;
-      if (args->funcType == ASYNC_FUNC_INIT) {
-        if (args->init.newcomm) ncclCommDestroy(*args->init.newcomm);
-        *args->init.newcomm = NULL;
-      } else {
-        struct ncclComm* comm = args->coll.comm;
-        struct ncclChannel* channel = &comm->channel;
-        for (int i=0; i<channel->collCount; i++) {
-          channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
-        }
-        channel->collFifoTail = channel->collStart;
-        channel->collCount = 0;
-        /* Cancel all proxy ops : mark them as ncclProxyOpNone and they should be freed later on */
-        struct ncclProxyState* state = &comm->proxyState;
-        struct ncclProxyArgs *op, *start;
-        pthread_mutex_lock(&state->mutex);
-        op = start = state->ops;
-        while (op) {
-          if (op->opCount >= comm->lastOpCount) op->state = ncclProxyOpNone;
-          struct ncclProxyArgs* peerOp = op->nextPeer;
-          while (peerOp) {
-            if (peerOp->opCount >= comm->lastOpCount) peerOp->state = ncclProxyOpNone;
-            peerOp = peerOp->nextPeer;
-          }
-          op = op->next;
-          if (op == start) break;
-        }
-        comm->opCount = comm->lastOpCount;
-        pthread_cond_signal(&state->cond);
-        pthread_mutex_unlock(&state->mutex);
-
-        comm->myParams->gridDim.x = comm->myParams->blockDim.x = 0;
-        comm->userStreamSet = false;
+      struct ncclComm* comm = args->coll.comm;
+      struct ncclChannel* channel = &comm->channel;
+      for (int i=0; i<channel->collCount; i++) {
+        channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
       }
+      channel->collFifoTail = channel->collStart;
+      channel->collCount = 0;
+      /* Cancel all proxy ops : mark them as ncclProxyOpNone and they should be freed later on */
+      struct ncclProxyState* state = &comm->proxyState;
+      struct ncclProxyArgs *op, *start;
+      pthread_mutex_lock(&state->mutex);
+      op = start = state->ops;
+      while (op) {
+        if (op->opCount >= comm->lastOpCount) op->state = ncclProxyOpNone;
+        struct ncclProxyArgs* peerOp = op->nextPeer;
+        while (peerOp) {
+          if (peerOp->opCount >= comm->lastOpCount) peerOp->state = ncclProxyOpNone;
+          peerOp = peerOp->nextPeer;
+        }
+        op = op->next;
+        if (op == start) break;
+      }
+      comm->opCount = comm->lastOpCount;
+      pthread_cond_signal(&state->cond);
+      pthread_mutex_unlock(&state->mutex);
+
+      comm->myParams->gridDim.x = comm->myParams->blockDim.x = 0;
+      comm->userStreamSet = false;
     }
   }
 end:

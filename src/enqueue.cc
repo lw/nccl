@@ -4,6 +4,8 @@
  * See LICENSE.txt for license information
  ************************************************************************/
 
+#include <cassert>
+
 #include "enqueue.h"
 #include "argcheck.h"
 #include "coll_net.h"
@@ -177,17 +179,13 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
   ssize_t nBytes = info->count*ncclTypeSize(info->datatype);
   if (info->recvbuff == NULL) {
     if (peer != comm->rank) {
-      if (comm->channel.peers[peer].send.connected == 0) {
-        p2plist->connect.send[p2plist->connect.nsend++] = peer;
-      }
+      assert(comm->channel.peers[peer].send.connected);
     }
     p2plist->peerlist[info->root].sendbytes = nBytes;
     p2plist->peerlist[info->root].sendbuff = info->sendbuff;
   } else {
     if (peer != comm->rank) {
-      if (comm->channel.peers[peer].recv.connected == 0) {
-        p2plist->connect.recv[p2plist->connect.nrecv++] = peer;
-      }
+      assert(comm->channel.peers[peer].recv.connected);
     }
     p2plist->peerlist[info->root].recvbytes = nBytes;
     p2plist->peerlist[info->root].recvbuff = info->recvbuff;

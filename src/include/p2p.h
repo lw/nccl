@@ -17,8 +17,6 @@ struct ncclP2Pinfo {
 };
 
 struct ncclP2PConnect {
-  int nrecv;
-  int nsend;
   int* recv;
   int* send;
 };

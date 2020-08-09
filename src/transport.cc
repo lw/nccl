@@ -4,6 +4,8 @@
  * See LICENSE.txt for license information
  ************************************************************************/
 
+#include <cassert>
+
 #include "comm.h"
 #include "info.h"
 #include "bootstrap.h"
@@ -31,51 +33,50 @@ static ncclResult_t selectTransport(struct ncclTopoSystem* topo, struct ncclPeer
   return ncclInternalError;
 }
 
-ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend) {
-  TRACE(NCCL_INIT, "nsend %d nrecv %d", nsend, nrecv);
-  uint32_t nSkippedSend = 0, nSkippedRecv = 0; /* for tracing */
+ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, int peer) {
+  struct ncclChannel* channel = &comm->channel;
   struct ncclConnect connect;
   struct ncclConnector* conn;
-  for (int i=0; i<nrecv; i++) {
-    int peer = peerRecv[i];
-    if (peer == -1 || peer >= comm->nRanks) continue;
+
+  {
+    assert(peer != -1 && peer >= 0 && peer < comm->nRanks);
     conn = &channel->peers[peer].recv;
-    if (conn->connected) { ++nSkippedRecv; continue; }
+    assert(!conn->connected);
     memset(&connect, 0, sizeof(connect));
     NCCLCHECK(selectTransport<0>(comm->topo, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn));
     NCCLCHECK(bootstrapSend(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
   }
-  for (int i=0; i<nsend; i++) {
-    int peer = peerSend[i];
-    if (peer == -1 || peer >= comm->nRanks) continue;
+
+  {
+    assert(peer != -1 && peer >= 0 && peer < comm->nRanks);
     conn = &channel->peers[peer].send;
-    if (conn->connected) { ++nSkippedSend; continue; }
+    assert(!conn->connected);
     memset(&connect, 0, sizeof(connect));
     NCCLCHECK(selectTransport<1>(comm->topo, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn));
     NCCLCHECK(bootstrapSend(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
   }
-  for (int i=0; i<nsend; i++) {
-    int peer = peerSend[i];
-    if (peer == -1 || peer >= comm->nRanks) continue;
+
+  {
+    assert(peer != -1 && peer >= 0 && peer < comm->nRanks);
     conn = &channel->peers[peer].send;
-    if (conn->connected) {++nSkippedSend; continue; }
+    assert(!conn->connected);
     memset(&connect, 0, sizeof(connect));
     NCCLCHECK(bootstrapRecv(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
     NCCLCHECK(conn->transportComm->connect(&connect, 1, comm->rank, conn));
     conn->connected = 1;
     CUDACHECK(cudaMemcpy(&channel->devPeers[peer].send, conn, sizeof(struct ncclConnector), cudaMemcpyHostToDevice));
   }
-  for (int i=0; i<nrecv; i++) {
-    int peer = peerRecv[i];
-    if (peer == -1 || peer >= comm->nRanks) continue;
+
+  {
+    assert(peer != -1 && peer >= 0 && peer < comm->nRanks);
     conn = &channel->peers[peer].recv;
-    if (conn->connected) {++nSkippedRecv; continue; }
+    assert(!conn->connected);
     memset(&connect, 0, sizeof(connect));
     NCCLCHECK(bootstrapRecv(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
     NCCLCHECK(conn->transportComm->connect(&connect, 1, comm->rank, conn));
     conn->connected = 1;
     CUDACHECK(cudaMemcpy(&channel->devPeers[peer].recv, conn, sizeof(struct ncclConnector), cudaMemcpyHostToDevice));
   }
-  TRACE(NCCL_INIT, "nsend %d nrecv %d nSkippedSend %u nSkippedRecv %u - DONE", nsend, nrecv, nSkippedSend, nSkippedRecv);
+
   return ncclSuccess;
 }
