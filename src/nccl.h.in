@@ -186,8 +186,6 @@ ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, in
  * a single NCCL operation. Nothing will be started on the CUDA stream until
  * ncclGroupEnd.
  */
-ncclResult_t  ncclGroupStart();
-ncclResult_t pncclGroupStart();
 
 /*
  * Group End
@@ -196,8 +194,7 @@ ncclResult_t pncclGroupStart();
  * ncclGroupStart. Operations on the CUDA stream depending on the NCCL operations
  * need to be called after ncclGroupEnd.
  */
-ncclResult_t  ncclGroupEnd();
-ncclResult_t pncclGroupEnd();
+ncclResult_t  ncclGroupEnd(ncclComm_t comm);
 
 #ifdef __cplusplus
 } // end extern "C"

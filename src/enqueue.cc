@@ -194,9 +194,6 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
 }
 
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
-  // Launch asynchronously if needed
-  assert(ncclAsyncMode());
-
   ncclResult_t ret = ncclSuccess;
   int savedDev = -1;
   // Check arguments
@@ -206,9 +203,6 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
     CUDACHECKGOTO(cudaSetDevice(info->comm->cudaDev), ret, end);
   }
   NCCLCHECKGOTO(ArgsCheck(info), ret, end);
-  // Always register comm even in case of error to make sure ncclGroupEnd
-  // cleans it up.
-  NCCLCHECKGOTO(ncclAsyncColl(info->comm), ret, end);
   NCCLCHECKGOTO(checkSetStream(info), ret, end);
 
   INFO(NCCL_COLL,"%s: opCount %lx sendbuff %p recvbuff %p count %zi datatype %d op %d root %d comm %p [nranks=%d] stream %p",
@@ -218,6 +212,8 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   NCCLCHECKGOTO(ncclSaveP2p(info), ret, end);
 end:
   if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
-  ncclAsyncErrCheck(ret);
+
+  NCCLCHECK(ncclGroupEnd(info->comm));
+
   return ret;
 }

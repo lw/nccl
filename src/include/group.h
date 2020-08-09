@@ -10,9 +10,6 @@
 #include "nccl.h"
 #include "comm.h"
 
-bool ncclAsyncMode();
-ncclResult_t ncclAsyncErrCheck(ncclResult_t ret);
-
 typedef ncclResult_t(*ncclInitFunc_t)(ncclComm_t* newcomm, int ndev, ncclUniqueId commId, int myrank, int cudaDev);
 
 typedef ncclResult_t(*ncclCollFunc_t)(const void* sendbuff, void* recvbuff, size_t count,
