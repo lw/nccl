@@ -324,7 +324,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   // Print final topology
   NCCLCHECK(ncclTopoPrint(comm->topo));
 
-  comm->nChannels = 1;
   comm->nNodes = 2;
   comm->node = rank;
 

@@ -85,9 +85,6 @@ struct ncclComm {
   uint64_t opCount;
   uint64_t lastOpCount;
 
-  // Channels for collectives
-  int nChannels;
-
   // Buffer sizes
   int buffSizes[NCCL_NUM_PROTOCOLS];
 
