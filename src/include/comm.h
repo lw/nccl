@@ -59,7 +59,7 @@ struct ncclRecvMem {
 };
 
 struct ncclComm {
-  struct ncclChannel channels[MAXCHANNELS];
+  struct ncclChannel channel;
 
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;

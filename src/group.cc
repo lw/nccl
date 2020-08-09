@@ -116,7 +116,7 @@ void* ncclAsyncThreadPreconnect(void* args_) {
   struct ncclAsyncArgs* args = (struct ncclAsyncArgs*)args_;
   CUDACHECKTHREAD(cudaSetDevice(args->coll.comm->cudaDev));
   struct ncclComm* comm = args->coll.comm;
-  struct ncclChannel* channel = comm->channels+0;
+  struct ncclChannel* channel = &comm->channel;
   struct ncclP2PConnect* connect = &comm->p2plist.connect;
   NCCLCHECKTHREAD(ncclTransportP2pSetup(
     comm, channel,
@@ -281,7 +281,7 @@ group_cleanup:
         *args->init.newcomm = NULL;
       } else {
         struct ncclComm* comm = args->coll.comm;
-        struct ncclChannel* channel = comm->channels;
+        struct ncclChannel* channel = &comm->channel;
         for (int i=0; i<channel->collCount; i++) {
           channel->collectives[(channel->collStart + i)%NCCL_MAX_OPS].active = 0;
         }

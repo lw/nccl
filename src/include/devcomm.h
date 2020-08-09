@@ -130,7 +130,6 @@ struct CollectiveArgs {
     struct {
       uint16_t nThreads;
       uint8_t bid;
-      // uint8_t nChannels;
       uint32_t root;
       size_t count;
       size_t lastChunkSize;
@@ -160,8 +159,6 @@ static_assert(sizeof(struct ncclColl) == (0x10*sizeof(int)), "ncclColl must have
 struct ncclChannel {
   union {
     struct {
-      int id;
-
       // Communication structures
       struct ncclPeer* peers;
       struct ncclPeer* devPeers;

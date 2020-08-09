@@ -552,7 +552,7 @@ ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** sy
   return ncclSuccess;
 }
 
-ncclResult_t ncclTopoGetLocalNet(struct ncclTopoSystem* system, int rank, int64_t* id, int rr) {
+ncclResult_t ncclTopoGetLocalNet(struct ncclTopoSystem* system, int rank, int64_t* id) {
   int g;
   NCCLCHECK(ncclTopoRankToIndex(system, rank, &g));
   int minType = PATH_SYS;
@@ -569,7 +569,7 @@ ncclResult_t ncclTopoGetLocalNet(struct ncclTopoSystem* system, int rank, int64_
     }
     if (path->width == maxWidth && path->type == minType) nets[count++] = system->nodes[NET].nodes[n].id;
   }
-  *id = nets[rr % count];
+  *id = nets[0];
   free(nets);
   return ncclSuccess;
 }

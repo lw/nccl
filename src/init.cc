@@ -153,8 +153,7 @@ static ncclResult_t commFree(ncclComm_t comm) {
   CUDACHECK(cudaFree(comm->hostDevComm.channels));
   CUDACHECK(cudaFree(comm->devComm));
 
-  for (int channel=0; channel<MAXCHANNELS; channel++)
-    NCCLCHECK(freeChannel(comm->channels+channel, comm->nRanks));
+  NCCLCHECK(freeChannel(&comm->channel, comm->nRanks));
 
   if (comm->doneEvent != NULL)
     CUDACHECK(cudaEventDestroy(comm->doneEvent));
@@ -213,9 +212,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   NCCLCHECK(ncclCalloc(&comm->p2plist.connect.recv, MAXCHANNELS*comm->nRanks)); // FIXME
   NCCLCHECK(ncclCalloc(&comm->p2plist.connect.send, MAXCHANNELS*comm->nRanks)); // FIXME
 
-  // Mark channels as non initialized.
-  for (int c=0; c<MAXCHANNELS; c++) comm->channels[c].id = -1;
-
   *comret = comm;
   return ncclSuccess;
 }
@@ -223,7 +219,7 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
 static ncclResult_t devCommSetup(ncclComm_t comm) {
   // Duplicate the channels on the device
   NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, 1));
-  NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, 1));
+  NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, &comm->channel, 1));
 
   // Duplicate the dev comm on the device
   NCCLCHECK(ncclCudaCalloc(&comm->devComm, 1));
@@ -338,7 +334,7 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 
   NCCLCHECK(computeBuffSizes(comm));
 
-  NCCLCHECKGOTO(initChannel(comm, 0), ret, affinity_restore);
+  NCCLCHECKGOTO(initChannel(comm), ret, affinity_restore);
 
   // We should have allocated all buffers, collective fifos, ... we can
   // restore the affinity.

@@ -37,9 +37,9 @@ ncclResult_t ncclTopoSearchInit(struct ncclTopoSystem* system) {
   return ncclSuccess;
 }
 
-ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, int channelId, int* dev) {
+ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, int* dev) {
   int64_t id;
-  NCCLCHECK(ncclTopoGetLocalNet(system, rank, &id, channelId));
+  NCCLCHECK(ncclTopoGetLocalNet(system, rank, &id));
   *dev = id;
 
   return ncclSuccess;

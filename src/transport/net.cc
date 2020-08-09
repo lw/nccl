@@ -53,12 +53,12 @@ ncclResult_t netCanConnect(int* ret, struct ncclPeerInfo* info1, struct ncclPeer
 
 /* Determine if we will use this transport for this peer and return connect
  * information for this peer */
-ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* send, int channelId) {
+ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* send) {
   struct netSendResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   send->transportResources = resources;
 
-  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, channelId, &resources->netDev));
+  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, &resources->netDev));
   NCCLCHECK(ncclTopoCheckGdr(topo, myInfo->busId, resources->netDev, 1, &resources->useGdr));
 
   NCCLCHECK(ncclCudaHostCalloc(&resources->sendMem, 1));
@@ -99,17 +99,17 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
     offsets[protoLoc[p]] += buffSizes[p];
   }
 
-  INFO(NCCL_INIT|NCCL_NET,"Channel %02d : %d[%lx] -> %d[%lx] [send] via NET/%s/%d%s", channelId, myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, ncclNetName(), resources->netDev,
+  INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [send] via NET/%s/%d%s", myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
   return ncclSuccess;
 }
 
-ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* recv, int channelId) {
+ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* recv) {
   struct netRecvResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   recv->transportResources = resources;
 
-  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, channelId, &resources->netDev));
+  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, &resources->netDev));
   NCCLCHECK(ncclTopoCheckGdr(topo, myInfo->busId, resources->netDev, 0, &resources->useGdr));
 
   NCCLCHECK(ncclCudaHostCalloc(&resources->sendMem, 1));
@@ -148,7 +148,7 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
     offsets[protoLoc[p]] += buffSizes[p];
   }
 
-  INFO(NCCL_INIT|NCCL_NET,"Channel %02d : %d[%lx] -> %d[%lx] [receive] via NET/%s/%d%s", channelId, peerInfo->rank, peerInfo->busId, myInfo->rank, myInfo->busId, ncclNetName(), resources->netDev,
+  INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [receive] via NET/%s/%d%s", peerInfo->rank, peerInfo->busId, myInfo->rank, myInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
   struct netConnectInfo* info = (struct netConnectInfo*) connectInfo;
   NCCLCHECK(ncclNetListen(resources->netDev, &info->netHandle, &resources->netListenComm));

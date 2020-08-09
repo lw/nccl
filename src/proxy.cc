@@ -78,8 +78,8 @@ static ncclResult_t SaveProxy(int peer, struct ncclProxyArgs* args) {
   struct ncclPeer* peerComm = args->channel->peers+peer;
   struct ncclConnector* connector = type == proxyRecv ? &peerComm->recv : &peerComm->send;
   if (connector->transportComm == NULL) {
-    WARN("[%d] Error no transport for %s peer %d on channel %d\n", connector->comm->rank,
-        type == proxyRecv ? "recv" : "send", peer, args->channel->id);
+    WARN("[%d] Error no transport for %s peer %d on channel\n", connector->comm->rank,
+        type == proxyRecv ? "recv" : "send", peer);
     return ncclInternalError;
   }
   if (connector->transportComm->proxy == NULL) return ncclSuccess;

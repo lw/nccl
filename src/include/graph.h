@@ -27,7 +27,7 @@ void ncclTopoFree(struct ncclTopoSystem* system);
 ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* comm);
 
 // Query topology
-ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, int channelId, int* net);
+ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, int* net);
 ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_t id2, int* p2p, int *read);
 ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* topo, int64_t busId, int netDev, int read, int* useGdr);
 
