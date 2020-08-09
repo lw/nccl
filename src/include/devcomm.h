@@ -130,7 +130,7 @@ struct CollectiveArgs {
     struct {
       uint16_t nThreads;
       uint8_t bid;
-      uint8_t nChannels;
+      // uint8_t nChannels;
       uint32_t root;
       size_t count;
       size_t lastChunkSize;

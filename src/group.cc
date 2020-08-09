@@ -119,7 +119,7 @@ void* ncclAsyncThreadPreconnect(void* args_) {
   struct ncclChannel* channel = comm->channels+0;
   struct ncclP2PConnect* connect = &comm->p2plist.connect;
   NCCLCHECKTHREAD(ncclTransportP2pSetup(
-    comm, NULL, channel,
+    comm, channel,
     connect->nrecv, connect->recv,
     connect->nsend, connect->send
   ));

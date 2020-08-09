@@ -15,15 +15,15 @@ struct ncclTransport ncclTransports[NTRANSPORTS] = {
 };
 
 template <int type>
-static ncclResult_t selectTransport(struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connect, struct ncclConnector* connector, int channelId) {
+static ncclResult_t selectTransport(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connect, struct ncclConnector* connector, int channelId) {
   for (int t=0; t<NTRANSPORTS; t++) {
     struct ncclTransport *transport = ncclTransports+t;
     struct ncclTransportComm* transportComm = type == 1 ? &transport->send : &transport->recv;
     int ret = 0;
-    NCCLCHECK(transport->canConnect(&ret, graph, myInfo, peerInfo));
+    NCCLCHECK(transport->canConnect(&ret, myInfo, peerInfo));
     if (ret) {
       connector->transportComm = transportComm;
-      NCCLCHECK(transportComm->setup(topo, graph, myInfo, peerInfo, connect, connector, channelId));
+      NCCLCHECK(transportComm->setup(topo, myInfo, peerInfo, connect, connector, channelId));
       return ncclSuccess;
     }
   }
@@ -31,7 +31,7 @@ static ncclResult_t selectTransport(struct ncclTopoSystem* topo, struct ncclTopo
   return ncclInternalError;
 }
 
-ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend) {
+ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend) {
   TRACE(NCCL_INIT, "nsend %d nrecv %d", nsend, nrecv);
   uint32_t nSkippedSend = 0, nSkippedRecv = 0; /* for tracing */
   struct ncclConnect connect;
@@ -42,7 +42,7 @@ ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* 
     conn = &channel->peers[peer].recv;
     if (conn->connected) { ++nSkippedRecv; continue; }
     memset(&connect, 0, sizeof(connect));
-    NCCLCHECK(selectTransport<0>(comm->topo, graph, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn, channel->id));
+    NCCLCHECK(selectTransport<0>(comm->topo, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn, channel->id));
     NCCLCHECK(bootstrapSend(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
   }
   for (int i=0; i<nsend; i++) {
@@ -51,7 +51,7 @@ ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* 
     conn = &channel->peers[peer].send;
     if (conn->connected) { ++nSkippedSend; continue; }
     memset(&connect, 0, sizeof(connect));
-    NCCLCHECK(selectTransport<1>(comm->topo, graph, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn, channel->id));
+    NCCLCHECK(selectTransport<1>(comm->topo, comm->peerInfo+comm->rank, comm->peerInfo+peer, &connect, conn, channel->id));
     NCCLCHECK(bootstrapSend(comm->bootstrap, peer, &connect, sizeof(struct ncclConnect)));
   }
   for (int i=0; i<nsend; i++) {

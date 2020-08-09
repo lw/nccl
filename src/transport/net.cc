@@ -46,19 +46,19 @@ struct netRecvResources {
 };
 
 /* Determine if two peers can communicate with NET */
-ncclResult_t netCanConnect(int* ret, struct ncclTopoGraph* graph, struct ncclPeerInfo* info1, struct ncclPeerInfo* info2) {
+ncclResult_t netCanConnect(int* ret, struct ncclPeerInfo* info1, struct ncclPeerInfo* info2) {
   *ret = 1;
   return ncclSuccess;
 }
 
 /* Determine if we will use this transport for this peer and return connect
  * information for this peer */
-ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* send, int channelId) {
+ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* send, int channelId) {
   struct netSendResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   send->transportResources = resources;
 
-  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, graph, channelId, &resources->netDev));
+  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, channelId, &resources->netDev));
   NCCLCHECK(ncclTopoCheckGdr(topo, myInfo->busId, resources->netDev, 1, &resources->useGdr));
 
   NCCLCHECK(ncclCudaHostCalloc(&resources->sendMem, 1));
@@ -80,7 +80,7 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclTopoGraph* gra
   int buffSizes[NCCL_NUM_PROTOCOLS];
   for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     // Only allocate buffers for simple for p2p connections
-    buffSizes[p] = graph == NULL && p != NCCL_PROTO_SIMPLE ? 0 : send->comm->buffSizes[p];
+    buffSizes[p] = p != NCCL_PROTO_SIMPLE ? 0 : send->comm->buffSizes[p];
     resources->buffSizes[protoLoc[p]] += buffSizes[p];
   }
 
@@ -104,12 +104,12 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclTopoGraph* gra
   return ncclSuccess;
 }
 
-ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* recv, int channelId) {
+ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peerInfo, struct ncclConnect* connectInfo, struct ncclConnector* recv, int channelId) {
   struct netRecvResources* resources;
   NCCLCHECK(ncclCalloc(&resources, 1));
   recv->transportResources = resources;
 
-  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, graph, channelId, &resources->netDev));
+  NCCLCHECK(ncclTopoGetNetDev(topo, myInfo->rank, channelId, &resources->netDev));
   NCCLCHECK(ncclTopoCheckGdr(topo, myInfo->busId, resources->netDev, 0, &resources->useGdr));
 
   NCCLCHECK(ncclCudaHostCalloc(&resources->sendMem, 1));
@@ -129,7 +129,7 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclTopoGraph* gra
   int buffSizes[NCCL_NUM_PROTOCOLS];
   for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
     // Only allocate buffers for simple for p2p connections
-    buffSizes[p] = graph == NULL && p != NCCL_PROTO_SIMPLE ? 0 : recv->comm->buffSizes[p];
+    buffSizes[p] = p != NCCL_PROTO_SIMPLE ? 0 : recv->comm->buffSizes[p];
     resources->buffSizes[protoLoc[p]] += buffSizes[p];
   }
 

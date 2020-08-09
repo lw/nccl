@@ -27,7 +27,7 @@ void ncclTopoFree(struct ncclTopoSystem* system);
 ncclResult_t ncclTopoTrimSystem(struct ncclTopoSystem* system, struct ncclComm* comm);
 
 // Query topology
-ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, struct ncclTopoGraph* graph, int channelId, int* net);
+ncclResult_t ncclTopoGetNetDev(struct ncclTopoSystem* system, int rank, int channelId, int* net);
 ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_t id2, int* p2p, int *read);
 ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* topo, int64_t busId, int netDev, int read, int* useGdr);
 
@@ -51,24 +51,6 @@ ncclResult_t ncclTopoSearchInit(struct ncclTopoSystem* system);
 #define NCCL_TOPO_PATTERN_SPLIT_TREE 2      // Split tree (send/recv from different ranks) flowing in both directions
 #define NCCL_TOPO_PATTERN_TREE 3            // Simple tree (send/recv from same rank) flowing in both directions
 #define NCCL_TOPO_PATTERN_RING 4            // Ring
-struct ncclTopoGraph {
-  // Input / output
-  int id; // ring : 0, tree : 1
-  int pattern;
-  int crossNic;
-  int minChannels;
-  int maxChannels;
-  // Output
-  int nChannels;
-  float speedIntra;
-  float speedInter;
-  int typeIntra;
-  int typeInter;
-  int sameChannels;
-  int nHops;
-  int intra[MAXCHANNELS*NCCL_TOPO_MAX_NODES];
-  int inter[MAXCHANNELS*2];
-};
 
 ncclResult_t ncclTopoTuneModel(struct ncclComm* comm);
 #include "info.h"

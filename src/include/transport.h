@@ -36,7 +36,7 @@ struct ncclConnect {
 };
 
 struct ncclTransportComm {
-  ncclResult_t (*setup)(struct ncclTopoSystem* topo, struct ncclTopoGraph* graph, struct ncclPeerInfo*, struct ncclPeerInfo*, struct ncclConnect*, struct ncclConnector*, int channelId);
+  ncclResult_t (*setup)(struct ncclTopoSystem* topo, struct ncclPeerInfo*, struct ncclPeerInfo*, struct ncclConnect*, struct ncclConnector*, int channelId);
   ncclResult_t (*connect)(struct ncclConnect*, int nranks, int rank, struct ncclConnector*);
   ncclResult_t (*free)(void*);
   ncclResult_t (*proxy)(struct ncclProxyArgs*);
@@ -44,11 +44,11 @@ struct ncclTransportComm {
 
 struct ncclTransport {
   const char name[4];
-  ncclResult_t (*canConnect)(int*, struct ncclTopoGraph* graph, struct ncclPeerInfo*, struct ncclPeerInfo*);
+  ncclResult_t (*canConnect)(int*, struct ncclPeerInfo*, struct ncclPeerInfo*);
   struct ncclTransportComm send;
   struct ncclTransportComm recv;
 };
 
-ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclTopoGraph* graph, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend);
+ncclResult_t ncclTransportP2pSetup(struct ncclComm* comm, struct ncclChannel* channel, int nrecv, int* peerRecv, int nsend, int* peerSend);
 
 #endif

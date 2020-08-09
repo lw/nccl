@@ -34,7 +34,6 @@ struct ncclInfo {
   int algorithm;
   int protocol;
   ncclPattern_t pattern;
-  int nChannels;
   int nThreads;
   size_t nBytes;
   int nstepsPerLoop;
