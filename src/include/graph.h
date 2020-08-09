@@ -45,7 +45,6 @@ ncclResult_t ncclTopoCpuType(struct ncclTopoSystem* system, int* arch, int* vend
 
 #define NCCL_TOPO_MAX_NODES 256
 
-// Init search. Needs to be done before calling ncclTopoCompute
 ncclResult_t ncclTopoSearchInit(struct ncclTopoSystem* system);
 
 #define NCCL_TOPO_PATTERN_SPLIT_TREE_LOOP 1 // Split tree (send/recv from different ranks) always flowing in the same direction
@@ -70,10 +69,6 @@ struct ncclTopoGraph {
   int intra[MAXCHANNELS*NCCL_TOPO_MAX_NODES];
   int inter[MAXCHANNELS*2];
 };
-ncclResult_t ncclTopoCompute(struct ncclTopoSystem* system, struct ncclTopoGraph* graph);
-
-ncclResult_t ncclTopoPrintGraph(struct ncclTopoSystem* system, struct ncclTopoGraph* graph);
-ncclResult_t ncclTopoDumpGraphs(struct ncclTopoSystem* system, int ngraphs, struct ncclTopoGraph** graphs);
 
 ncclResult_t ncclTopoTuneModel(struct ncclComm* comm);
 #include "info.h"
