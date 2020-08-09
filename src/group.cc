@@ -58,19 +58,29 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
       ssize_t stepSize = 4*comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
       ssize_t recvChunkSize = p2plist->peerlist[from].recvbytes;
       ssize_t sendChunkSize = p2plist->peerlist[to].sendbytes;
+      // Round up to nearest multiple of stepSize; if 0 make it stepSize.
       recvChunkSize = std::max((ssize_t)1, DIVUP(recvChunkSize, stepSize)) * stepSize;
       sendChunkSize = std::max((ssize_t)1, DIVUP(sendChunkSize, stepSize)) * stepSize;
 
       ssize_t sendOffset = 0;
       ssize_t recvOffset = 0;
       int remaining = 1;
-      int chunk = 0;
       while (remaining) {
         remaining = 0;
         ssize_t recvbytes = p2plist->peerlist[from].recvbytes-recvOffset;
         ssize_t sendbytes = p2plist->peerlist[to].sendbytes-sendOffset;
-        if (recvbytes > recvChunkSize) { remaining = 1; recvbytes = recvChunkSize; } else p2plist->peerlist[from].recvbytes = -1;
-        if (sendbytes > sendChunkSize) { remaining = 1; sendbytes = sendChunkSize; } else p2plist->peerlist[to].sendbytes = -1;
+        if (recvbytes > recvChunkSize) {
+          remaining = 1;
+          recvbytes = recvChunkSize;
+        } else {
+          p2plist->peerlist[from].recvbytes = -1;
+        }
+        if (sendbytes > sendChunkSize) {
+          remaining = 1;
+          sendbytes = sendChunkSize;
+        } else {
+          p2plist->peerlist[to].sendbytes = -1;
+        }
         if (sendbytes >= 0 || recvbytes >= 0) {
           NCCLCHECKGOTO(scheduleSendRecv(comm, delta,
                 recvbytes, ((char*)(p2plist->peerlist[from].recvbuff)) + recvOffset,
@@ -78,7 +88,6 @@ ncclResult_t ncclGroupEnd(struct ncclComm* comm) {
         }
         recvOffset += recvChunkSize;
         sendOffset += sendChunkSize;
-        chunk++;
       }
     }
     p2plist->count = 0;
