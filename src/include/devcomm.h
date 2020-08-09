@@ -121,27 +121,11 @@ struct CollectiveArgs {
   const void * sendbuff;
   void * recvbuff;
 
-  // Op-specific fields. Make sure the common part stays the
-  // same on all structs of the union
-  union {
-    struct {
-      uint16_t nThreads;
-    } common;
-    struct {
-      uint16_t nThreads;
-      uint8_t bid;
-      uint32_t root;
-      size_t count;
-      size_t lastChunkSize;
-    } coll;
-    struct {
-      uint16_t nThreads;
-      uint16_t unused;
-      int32_t delta;
-      size_t sendCount;
-      size_t recvCount;
-    } p2p;
-  };
+  uint16_t nThreads;
+  uint16_t unused;
+  int32_t delta;
+  size_t sendCount;
+  size_t recvCount;
 };
 struct ncclColl {
   union {

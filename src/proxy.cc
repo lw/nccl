@@ -102,7 +102,6 @@ ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel
   args.chunkSteps = 1;
   args.protocol = NCCL_PROTO_SIMPLE;
   args.opCount = info->comm->opCount;
-  // args.dtype = info->datatype;
   if (info->delta > 0 && info->sendbytes >= 0) {
     int peersend = (info->comm->rank+info->delta)%info->comm->nRanks;
     args.nsteps = DIVUP(info->sendbytes, info->comm->buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS/SENDRECV_SLICEFACTOR);

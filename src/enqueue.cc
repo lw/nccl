@@ -20,21 +20,22 @@ static void* const ncclKerns[1] = {
 /*****************************************************************************/
 
 ncclResult_t setupLaunch(struct ncclComm* comm, struct cudaLaunchParams* params) {
+    struct ncclChannel* channel = &comm->channel;
+
   // Only launch blocks where we have work to do.
-  if (comm->channel.collCount) {
+  if (channel->collCount) {
     params->gridDim.x = 1;
   }
 
   // Set active = 2 for the last operation and add a no-op on empty channels (p2p case).
   for (int c=0; c<params->gridDim.x; c++) {
-    struct ncclChannel* channel = &comm->channel;
     if (channel->collCount == 0) {
       int opIndex = channel->collFifoTail;
       struct ncclColl* c = channel->collectives+opIndex;
       volatile uint8_t* activePtr = (volatile uint8_t*)&c->active;
       while (activePtr[0] != 0) sched_yield();
 
-      c->args.p2p.delta = -1; // no-op
+      c->args.delta = -1; // no-op
       c->funcIndex = 0;
       c->args.comm = comm->devComm;
       c->active = 1;
@@ -43,7 +44,7 @@ ncclResult_t setupLaunch(struct ncclComm* comm, struct cudaLaunchParams* params)
       channel->collFifoTail = opIndex;
       channel->collCount++;
     }
-    channel->collectives[(channel->collStart+channel->collCount-1)%NCCL_MAX_OPS].active = 2;
+    channel->collectives[(channel->collStart + channel->collCount - 1) % NCCL_MAX_OPS].active = 2;
   }
 
   // Find the first operation, choose the kernel accordingly and pass it
@@ -106,17 +107,17 @@ ncclResult_t ncclEnqueueEvents(ncclComm_t comm) {
 /* Enqueueing system : computation of kernel and proxy operations parameters */
 /*****************************************************************************/
 
-static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclColl* coll, struct ncclProxyArgs* proxyArgs /* output */) {
+static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclColl* coll) {
   coll->args.sendbuff = info->sendbuff;
   coll->args.recvbuff = info->recvbuff;
   coll->args.comm = info->comm->devComm;
   coll->args.opCount = info->comm->opCount;
 
-  coll->args.p2p.sendCount = info->sendbytes;
-  coll->args.p2p.recvCount = info->recvbytes;
-  coll->args.p2p.delta = info->delta;
+  coll->args.sendCount = info->sendbytes;
+  coll->args.recvCount = info->recvbytes;
+  coll->args.delta = info->delta;
   coll->funcIndex = 0;
-  coll->args.p2p.nThreads = info->nThreads = info->comm->maxThreads + 2*WARP_SIZE;
+  coll->args.nThreads = info->nThreads = info->comm->maxThreads + 2*WARP_SIZE;
   return ncclSuccess;
 }
 
@@ -133,9 +134,7 @@ static ncclResult_t checkSetStream(struct ncclInfo* info) {
 
 ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
   struct ncclColl coll;
-  struct ncclProxyArgs proxyArgs;
-  memset(&proxyArgs, 0, sizeof(struct ncclProxyArgs));
-  NCCLCHECK(computeColl(info, &coll, &proxyArgs));
+  NCCLCHECK(computeColl(info, &coll));
 
   info->comm->myParams->blockDim.x = std::max<unsigned>(info->comm->myParams->blockDim.x, info->nThreads);
 
@@ -145,9 +144,6 @@ ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
     WARN("Too many aggregated operations on channel (%d max)", NCCL_MAX_OPS);
     return ncclInvalidUsage;
   }
-
-  // Proxy
-  proxyArgs.channel = channel;
 
   info->comm->myParams->gridDim.x = std::max<unsigned>(info->comm->myParams->gridDim.x, 1);
   NCCLCHECK(ncclProxySaveP2p(info, channel));

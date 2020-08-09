@@ -11,21 +11,21 @@
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
   const int tid = threadIdx.x;
-  const int nthreads = args->p2p.nThreads-2*WARP_SIZE;
+  const int nthreads = args->nThreads-2*WARP_SIZE;
 
   // Compute pointers
   const T* sendbuff = (const T*)args->sendbuff;
   T* recvbuff = (T*)args->recvbuff;
 
-  if (args->p2p.delta < 0 ) return; // No-op
+  if (args->delta < 0 ) return; // No-op
 
-  if (args->p2p.delta == 0) {
+  if (args->delta == 0) {
     if (tid < nthreads && sendbuff != recvbuff) {
       // local copy : ReduceOrCopyMulti takes an int as number of elements,
       // so we split it in blocks of 1G elements.
       int blockSize = 1<<30;
-      for (size_t offset=0; offset<args->p2p.sendCount; offset += blockSize) {
-        size_t remaining = args->p2p.sendCount - offset;
+      for (size_t offset=0; offset<args->sendCount; offset += blockSize) {
+        size_t remaining = args->sendCount - offset;
         if (remaining < blockSize) blockSize = remaining;
         ReduceOrCopyMulti<UNROLL, FUNC, T, 1, 1, 1, 1>(tid, nthreads, 1, &sendbuff, 1, &recvbuff, blockSize);
         sendbuff += blockSize; recvbuff += blockSize;
@@ -46,10 +46,10 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
   int peerNone[2] = {-1,-1};
 
   if (tid < nthreadsSplit + WARP_SIZE ) {
-    const ssize_t sendSize = args->p2p.sendCount;
+    const ssize_t sendSize = args->sendCount;
     if (sendSize < 0) return;
 
-    int peer = (comm->rank+(int)args->p2p.delta)%comm->nRanks;
+    int peer = (comm->rank+(int)args->delta)%comm->nRanks;
     ncclPrimitives<UNROLL, 1, 1, T, 2, 1, 1, FUNC>
       prims(tid, nthreadsSplit, peerNone, &peer, recvbuff, stepSize*4, channel, comm, args->opCount);
 
@@ -62,10 +62,10 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
       prims.directSend(sendbuff+offset, offset, nelem);
     }
   } else {
-    const ssize_t recvSize = args->p2p.recvCount;
+    const ssize_t recvSize = args->recvCount;
     if (recvSize < 0) return;
 
-    int peer = (comm->rank-(int)args->p2p.delta+comm->nRanks)%comm->nRanks;
+    int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
     ncclPrimitives<UNROLL, 1, 1, T, 1, 2, 1, FUNC>
       prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, &peer, peerNone, recvbuff, stepSize*4, channel, comm, args->opCount);
 

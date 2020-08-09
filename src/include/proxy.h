@@ -23,7 +23,6 @@ struct ncclProxyArgs {
   int nsteps;
   uint64_t opCount;
   int protocol;
-  // ncclDataType_t dtype;
   ncclRedOp_t redOp;
   int state;   // add component before this line -- it is left out during initialization
 

@@ -43,57 +43,6 @@ static __device__ void load_coll(struct ncclColl* localColl, struct ncclColl* ho
 
 extern __device__ volatile uint64_t* ncclShmem;
 
-#define NCCL_COLL_NAME(coll, op, dtype) \
-  coll##_##op##_##dtype
-
-#define NCCL_KERN_NAME(coll, op, dtype) \
-  coll##Kernel_##op##_##dtype
-
-/* Functions for aggregation case */
-#define IMPL_COLL_FUNC(coll, op, ncclFunc, dtype, ctype) \
-__device__ void NCCL_COLL_NAME(coll, op, dtype)(struct CollectiveArgs* args) { \
-  coll##Kernel<COLL_UNROLL, ncclFunc<ctype>, ctype>(args); \
-}
-
-/* Kernels with the first operation inlined */
-#define IMPL_COLL_KERN(coll, op, ncclFunc, dtype, ctype, fIndex) \
-__global__ void NCCL_KERN_NAME(coll, op, dtype)(struct ncclColl firstColl) { \
-  int tid = threadIdx.x; \
-  int bid = blockIdx.x; \
-  __shared__ volatile uint64_t shmem[NCCL_LL128_SHMEM_SIZE]; \
-  ncclShmem = shmem; \
-  __shared__ struct ncclColl localColl; \
- \
-  struct ncclDevComm* comm = firstColl.args.comm; \
-  struct ncclChannel* channel = comm->channels+bid; \
-  struct ncclColl* c; \
-  if (bid == 0) { \
-    /* To optimize for latency, (only) the first operation is passed as argument.*/ \
-    c = &firstColl; \
-  } else { \
-    c = &localColl; \
-    load_coll(c, channel->collectives+channel->collFifoHead, tid, comm); \
-  } \
-  while (1) { \
-    if (tid < c->args.common.nThreads) { \
-      if (c->funcIndex == fIndex) { \
-        coll##Kernel<COLL_UNROLL, ncclFunc<ctype>, ctype>(&c->args); \
-      } else { \
-        ncclFuncs[c->funcIndex](&c->args); \
-      } \
-    } \
-    int nextIndex = c->nextIndex; \
-    if (tid == 0) channel->collFifoHead = nextIndex; \
- \
-    if (c->active == 2) { \
-      return; \
-    } \
- \
-    /* Load next collective operation*/ \
-    c = &localColl; /* for bid 0 */ \
-    load_coll(c, channel->collectives+nextIndex, tid, comm); \
-  } \
-}
 
 #define COLL_UNROLL 4
 
