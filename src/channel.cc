@@ -17,16 +17,10 @@ ncclResult_t initChannel(struct ncclComm* comm) {
     channel->peers[i].send.comm = comm;
     channel->peers[i].recv.comm = comm;
   }
-
-  // Per-channel operation list.
-  NCCLCHECK(ncclCudaHostCalloc(&channel->collectives, NCCL_MAX_OPS));
   return ncclSuccess;
 }
 
 ncclResult_t freeChannel(struct ncclChannel* channel, int nRanks) {
-  // Operation list
-  NCCLCHECK(ncclCudaHostFree(channel->collectives));
-
   // Free transport proxy resources
   for (int r=0; r<nRanks; r++) {
     struct ncclPeer* peer = channel->peers+r;

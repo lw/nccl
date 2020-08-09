@@ -25,24 +25,8 @@ static inline __device__ void exitIfAbortBarrier(int abort) {
 }
 
 typedef void(*ncclKern_t)(struct CollectiveArgs* args);
-extern __device__ ncclKern_t ncclFuncs[];
-
-static __device__ void load_parallel(void* dst, void* src, size_t size, int tid) {
-  int* d = (int*)dst;
-  int* s = (int*)src;
-  for (int o = tid; o < (size/sizeof(int)); o += blockDim.x) d[o] = s[o];
-}
-static __device__ void load_coll(struct ncclColl* localColl, struct ncclColl* hostColl, int tid, struct ncclDevComm* comm) {
-  // Check whether the last operation was aborted and make sure all threads exit
-  int abort = tid == 0 ? *(comm->abortFlag) : 0;
-  exitIfAbortBarrier(abort);
-  load_parallel(localColl, hostColl, sizeof(struct ncclColl), tid);
-  __syncthreads();
-  if (tid == 0) hostColl->active = 0;
-}
 
 extern __device__ volatile uint64_t* ncclShmem;
-
 
 #define COLL_UNROLL 4
 
