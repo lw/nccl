@@ -10,10 +10,4 @@
 #include "nccl.h"
 #include "comm.h"
 
-typedef ncclResult_t(*ncclInitFunc_t)(ncclComm_t* newcomm, int ndev, ncclUniqueId commId, int myrank, int cudaDev);
-
-typedef ncclResult_t(*ncclCollFunc_t)(const void* sendbuff, void* recvbuff, size_t count,
-    ncclDataType_t type, ncclRedOp_t op, int root, ncclComm_t comm, cudaStream_t stream);
-
-ncclResult_t ncclAsyncColl(ncclComm_t comm);
 #endif

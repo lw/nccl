@@ -58,15 +58,15 @@ int main(int argc, char* argv[])
       assert(nbytes == sizeof(id));
     }
 
-    float* sendbuff;
-    float* recvbuff;
+    int8_t* sendbuff;
+    int8_t* recvbuff;
     cudaStream_t s;
 
     CUDACHECK(cudaSetDevice(rank));
-    CUDACHECK(cudaMalloc(&sendbuff, size * sizeof(float)));
-    CUDACHECK(cudaMalloc(&recvbuff, size * sizeof(float)));
-    CUDACHECK(cudaMemset(sendbuff, 1, size * sizeof(float)));
-    CUDACHECK(cudaMemset(recvbuff, 0, size * sizeof(float)));
+    CUDACHECK(cudaMalloc(&sendbuff, size));
+    CUDACHECK(cudaMalloc(&recvbuff, size));
+    CUDACHECK(cudaMemset(sendbuff, 1, size));
+    CUDACHECK(cudaMemset(recvbuff, 0, size));
     CUDACHECK(cudaStreamCreate(&s));
 
     ncclComm_t comm;
@@ -76,17 +76,17 @@ int main(int argc, char* argv[])
     ncclTransportP2pSetup(comm, rank ^ 1);
 
     if (rank == 0) {
-      NCCLCHECK(ncclSend((const void*)sendbuff, size, ncclFloat, rank ^ 1, comm, s));
+      NCCLCHECK(ncclSend((const void*)sendbuff, size, rank ^ 1, comm, s));
     } else {
-      NCCLCHECK(ncclRecv((void*)recvbuff, size, ncclFloat, rank ^ 1, comm, s));
+      NCCLCHECK(ncclRecv((void*)recvbuff, size, rank ^ 1, comm, s));
     }
 
     CUDACHECK(cudaStreamSynchronize(s));
 
     if (rank == 1) {
-      std::unique_ptr<uint8_t[]> cpuPtr((uint8_t*)malloc(size * sizeof(float)));
-      CUDACHECK(cudaMemcpy((void*)cpuPtr.get(), (const void*)recvbuff, size * sizeof(float), cudaMemcpyDefault));
-      for (int i = 0; i < size * sizeof(float); i ++) {
+      std::unique_ptr<uint8_t[]> cpuPtr((uint8_t*)malloc(size));
+      CUDACHECK(cudaMemcpy((void*)cpuPtr.get(), (const void*)recvbuff, size, cudaMemcpyDefault));
+      for (int i = 0; i < size; i ++) {
         assert(cpuPtr[i] == 1);
       }
     }

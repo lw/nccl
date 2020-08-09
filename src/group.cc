@@ -29,7 +29,7 @@ thread_local pthread_t ncclGroupThreads[MAX_ASYNC_OPS];
 
 static ncclResult_t scheduleSendRecv(struct ncclComm* comm, int delta, ssize_t recvbytes, void* recvbuff, ssize_t sendbytes, const void* sendbuff) {
   struct ncclInfo info = { ncclCollSendRecv, "SendRecv",
-    sendbuff, recvbuff, (size_t)std::max<ssize_t>(sendbytes,recvbytes), ncclInt8, ncclSum, -1, comm, comm->userStream, /* Args */
+    sendbuff, recvbuff, (size_t)std::max<ssize_t>(sendbytes,recvbytes), ncclSum, -1, comm, comm->userStream, /* Args */
     1, 1 };
   info.delta = delta;
   info.sendbytes = sendbytes;

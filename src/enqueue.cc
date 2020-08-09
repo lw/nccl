@@ -176,19 +176,18 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
   struct ncclP2Plist* p2plist = &comm->p2plist;
   int peer = info->root;
   p2plist->count++;
-  ssize_t nBytes = info->count*ncclTypeSize(info->datatype);
   if (info->recvbuff == NULL) {
     if (peer != comm->rank) {
       assert(comm->channel.peers[peer].send.connected);
     }
-    p2plist->peerlist[info->root].sendbytes = nBytes;
-    p2plist->peerlist[info->root].sendbuff = info->sendbuff;
+    p2plist->peerlist[peer].sendbytes = info->length;
+    p2plist->peerlist[peer].sendbuff = info->sendbuff;
   } else {
     if (peer != comm->rank) {
       assert(comm->channel.peers[peer].recv.connected);
     }
-    p2plist->peerlist[info->root].recvbytes = nBytes;
-    p2plist->peerlist[info->root].recvbuff = info->recvbuff;
+    p2plist->peerlist[peer].recvbytes = info->length;
+    p2plist->peerlist[peer].recvbuff = info->recvbuff;
   }
   return ncclSuccess;
 }
@@ -196,7 +195,7 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   ncclResult_t ret = ncclSuccess;
   int savedDev = -1;
-  // Check arguments
+
   NCCLCHECK(PtrCheck(info->comm, info->opName, "comm"));
   if (info->comm->checkPointers) {
     CUDACHECKGOTO(cudaGetDevice(&savedDev), ret, end);
@@ -204,10 +203,6 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   }
   NCCLCHECKGOTO(ArgsCheck(info), ret, end);
   NCCLCHECKGOTO(checkSetStream(info), ret, end);
-
-  INFO(NCCL_COLL,"%s: opCount %lx sendbuff %p recvbuff %p count %zi datatype %d op %d root %d comm %p [nranks=%d] stream %p",
-      info->opName, info->comm->opCount, info->sendbuff, info->recvbuff, info->count,
-      info->datatype, info->op, info->root, info->comm, info->comm->nRanks, info->stream);
 
   NCCLCHECKGOTO(ncclSaveP2p(info), ret, end);
 end:

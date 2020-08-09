@@ -8,22 +8,22 @@
 #include "collectives.h"
 #include "argcheck.h" // Need some checks here since we access comm
 
-NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
+NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
-ncclResult_t ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t ncclSend(const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollSendRecv, "Send",
-    sendbuff, NULL, count, datatype, ncclSum, peer, comm, stream, /* Args */
+    sendbuff, NULL, count, ncclSum, peer, comm, stream, /* Args */
     1, 1 };
   return ncclEnqueueCheck(&info);
 }
 
-NCCL_API(ncclResult_t, ncclRecv, void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
+NCCL_API(ncclResult_t, ncclRecv, void* recvbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
-ncclResult_t ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t ncclRecv(void* recvbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollSendRecv, "Recv",
-    NULL, recvbuff, count, datatype, ncclSum, peer, comm, stream, /* Args */
+    NULL, recvbuff, count, ncclSum, peer, comm, stream, /* Args */
     1, 1 };
   return ncclEnqueueCheck(&info);
 }

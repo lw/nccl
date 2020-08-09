@@ -97,16 +97,16 @@ typedef enum { ncclSum        = 0,
                ncclNumOps     = 4 } ncclRedOp_t;
 
 /* Data types */
-typedef enum { ncclInt8       = 0, ncclChar       = 0,
-               ncclUint8      = 1,
-               ncclInt32      = 2, ncclInt        = 2,
-               ncclUint32     = 3,
-               ncclInt64      = 4,
-               ncclUint64     = 5,
-               ncclFloat16    = 6, ncclHalf       = 6,
-               ncclFloat32    = 7, ncclFloat      = 7,
-               ncclFloat64    = 8, ncclDouble     = 8,
-               ncclNumTypes   = 9 } ncclDataType_t;
+// typedef enum { ncclInt8       = 0, ncclChar       = 0,
+//                ncclUint8      = 1,
+//                ncclInt32      = 2, ncclInt        = 2,
+//                ncclUint32     = 3,
+//                ncclInt64      = 4,
+//                ncclUint64     = 5,
+//                ncclFloat16    = 6, ncclHalf       = 6,
+//                ncclFloat32    = 7, ncclFloat      = 7,
+//                ncclFloat64    = 8, ncclDouble     = 8,
+//                ncclNumTypes   = 9 } ncclDataType_t;
 
 ncclResult_t ncclTransportP2pSetup(ncclComm_t comm, int peer);
 
@@ -128,16 +128,16 @@ ncclResult_t ncclTransportP2pSetup(ncclComm_t comm, int peer);
  *
  * Send data from sendbuff to rank peer.
  *
- * Rank peer needs to call ncclRecv with the same datatype and the same count from this
+ * Rank peer needs to call ncclRecv with the same and the same count from this
  * rank.
  *
  * This operation is blocking for the GPU. If multiple ncclSend and ncclRecv operations
  * need to progress concurrently to complete, they must be fused within a ncclGroupStart/
  * ncclGroupEnd section.
  */
-ncclResult_t  ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t  ncclSend(const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
-ncclResult_t pncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t pncclSend(const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
 
 /*
@@ -145,16 +145,16 @@ ncclResult_t pncclSend(const void* sendbuff, size_t count, ncclDataType_t dataty
  *
  * Receive data from rank peer into recvbuff.
  *
- * Rank peer needs to call ncclSend with the same datatype and the same count to this
+ * Rank peer needs to call ncclSend with the same and the same count to this
  * rank.
  *
  * This operation is blocking for the GPU. If multiple ncclSend and ncclRecv operations
  * need to progress concurrently to complete, they must be fused within a ncclGroupStart/
  * ncclGroupEnd section.
  */
-ncclResult_t pncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t pncclRecv(void* recvbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
-ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
+ncclResult_t  ncclRecv(void* recvbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);
 
 /*
