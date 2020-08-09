@@ -145,6 +145,5 @@ end:
   }
   NCCLCHECKGOTO(ncclEnqueueEvents(comm), ret, end);
 
-
   return ret;
 }

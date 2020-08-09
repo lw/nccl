@@ -8,10 +8,6 @@
 #include "common.h"
 #include "collectives.h"
 
-__device__ void ncclSendRecv_copy_i8(struct CollectiveArgs* args) {
-  ncclSendRecvKernel<COLL_UNROLL, FuncSum<int8_t>, int8_t>(args);
-}
-
 __global__ void ncclSendRecvKernel_copy_i8(struct ncclColl firstColl) {
   __shared__ volatile uint64_t shmem[NCCL_LL128_SHMEM_SIZE];
   ncclShmem = shmem;
