@@ -195,43 +195,29 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
 
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   // Launch asynchronously if needed
-  if (ncclAsyncMode()) {
-    ncclResult_t ret = ncclSuccess;
-    int savedDev = -1;
-    // Check arguments
-    NCCLCHECK(PtrCheck(info->comm, info->opName, "comm"));
-    if (info->comm->checkPointers) {
-      CUDACHECKGOTO(cudaGetDevice(&savedDev), ret, end);
-      CUDACHECKGOTO(cudaSetDevice(info->comm->cudaDev), ret, end);
-    }
-    NCCLCHECKGOTO(ArgsCheck(info), ret, end);
-    // Always register comm even in case of error to make sure ncclGroupEnd
-    // cleans it up.
-    NCCLCHECKGOTO(ncclAsyncColl(info->comm), ret, end);
-    NCCLCHECKGOTO(checkSetStream(info), ret, end);
+  assert(ncclAsyncMode());
 
-    INFO(NCCL_COLL,"%s: opCount %lx sendbuff %p recvbuff %p count %zi datatype %d op %d root %d comm %p [nranks=%d] stream %p",
-        info->opName, info->comm->opCount, info->sendbuff, info->recvbuff, info->count,
-        info->datatype, info->op, info->root, info->comm, info->comm->nRanks, info->stream);
-
-    NCCLCHECKGOTO(ncclSaveP2p(info), ret, end);
-end:
-    if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
-    ncclAsyncErrCheck(ret);
-    return ret;
-  } else {
-    NCCLCHECK(PtrCheck(info->comm, info->opName, "comm"));
-    NCCLCHECK(ArgsCheck(info));
-    NCCLCHECK(checkSetStream(info));
-
-    INFO(NCCL_COLL,"%s: opCount %lx sendbuff %p recvbuff %p count %zi datatype %d op %d root %d comm %p [nranks=%d] stream %p",
-        info->opName, info->comm->opCount, info->sendbuff, info->recvbuff, info->count,
-        info->datatype, info->op, info->root, info->comm, info->comm->nRanks, info->stream);
-
-    NCCLCHECK(ncclSaveKernel(info));
-    NCCLCHECK(ncclBarrierEnqueue(info->comm));
-    NCCLCHECK(ncclBarrierEnqueueWait(info->comm));
-    NCCLCHECK(ncclEnqueueEvents(info->comm));
-    return ncclSuccess;
+  ncclResult_t ret = ncclSuccess;
+  int savedDev = -1;
+  // Check arguments
+  NCCLCHECK(PtrCheck(info->comm, info->opName, "comm"));
+  if (info->comm->checkPointers) {
+    CUDACHECKGOTO(cudaGetDevice(&savedDev), ret, end);
+    CUDACHECKGOTO(cudaSetDevice(info->comm->cudaDev), ret, end);
   }
+  NCCLCHECKGOTO(ArgsCheck(info), ret, end);
+  // Always register comm even in case of error to make sure ncclGroupEnd
+  // cleans it up.
+  NCCLCHECKGOTO(ncclAsyncColl(info->comm), ret, end);
+  NCCLCHECKGOTO(checkSetStream(info), ret, end);
+
+  INFO(NCCL_COLL,"%s: opCount %lx sendbuff %p recvbuff %p count %zi datatype %d op %d root %d comm %p [nranks=%d] stream %p",
+      info->opName, info->comm->opCount, info->sendbuff, info->recvbuff, info->count,
+      info->datatype, info->op, info->root, info->comm, info->comm->nRanks, info->stream);
+
+  NCCLCHECKGOTO(ncclSaveP2p(info), ret, end);
+end:
+  if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
+  ncclAsyncErrCheck(ret);
+  return ret;
 }

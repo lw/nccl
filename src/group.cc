@@ -24,14 +24,6 @@ ncclResult_t ncclAsyncErrCheck(ncclResult_t ret) {
   return ret;
 }
 
-struct ncclInitArgs {
-  ncclInitFunc_t func;
-  int cudaDev;
-  ncclComm_t* newcomm;
-  int ndev;
-  ncclUniqueId commId;
-  int myrank;
-};
 struct ncclCollArgs {
   ncclComm_t comm;
   int connect;
@@ -44,10 +36,7 @@ enum ncclAsyncFuncType {
 struct ncclAsyncArgs {
   ncclResult_t ret;
   enum ncclAsyncFuncType funcType;
-  union {
-    ncclCollArgs coll;
-    ncclInitArgs init;
-  };
+  ncclCollArgs coll;
 };
 
 thread_local struct ncclAsyncArgs ncclGroupArgs[MAX_ASYNC_OPS];
@@ -66,12 +55,6 @@ thread_local struct ncclAsyncArgs ncclGroupArgs[MAX_ASYNC_OPS];
     return args; \
   } \
 } while(0)
-
-void* ncclAsyncThreadMain(void* args_) {
-  struct ncclAsyncArgs* args = (struct ncclAsyncArgs*)args_;
-  NCCLCHECKTHREAD(args->init.func(args->init.newcomm, args->init.ndev, args->init.commId, args->init.myrank, args->init.cudaDev));
-  return args;
-}
 
 ncclResult_t ncclAsyncColl(ncclComm_t comm) {
   struct ncclAsyncArgs* args = ncclGroupArgs;
