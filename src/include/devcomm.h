@@ -34,8 +34,6 @@ struct ncclConnInfo {
   char *buff; // Local for recv, remote for send
   uint64_t *tail;     // Local for recv, remote for send
   uint64_t *head;     // Local for send, remote for recv
-  uint64_t *opCountLoc; // opCount of local rank
-  uint64_t *opCountRem; // opCount of remote rank
 
   int direct;         // Direct communication
   void **ptrExchange; // Pointer exchange for direct communication
@@ -67,7 +65,6 @@ struct ncclDevComm;
 /* Make sure to adjust padding at the end of ncclColl. */
 struct CollectiveArgs {
   struct ncclDevComm* comm;
-  uint64_t opCount;
 
   // local and remote input, output, and buffer
   const void * sendbuff;
@@ -81,9 +78,7 @@ struct CollectiveArgs {
 };
 struct ncclColl {
   union {
-    struct {
-      struct CollectiveArgs args;
-    };
+    struct CollectiveArgs args;
     int data[0x10];
   };
 };

@@ -32,7 +32,6 @@ ncclResult_t ncclBarrierEnqueueWait(ncclComm_t comm) {
   CUDACHECK(cudaLaunchKernel(params->func, params->gridDim, params->blockDim, params->args, params->sharedMem, params->stream));
 
   params->gridDim.x = params->blockDim.x = 0;
-  comm->lastOpCount = comm->opCount;
   NCCLCHECK(ncclProxyStart(comm));
   return ncclSuccess;
 }
@@ -53,7 +52,6 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.sendbuff = info->sendbuff;
   coll->args.recvbuff = info->recvbuff;
   coll->args.comm = info->comm->devComm;
-  coll->args.opCount = info->comm->opCount;
 
   coll->args.sendCount = info->sendbytes;
   coll->args.recvCount = info->recvbytes;
@@ -88,7 +86,6 @@ ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
 
   info->comm->myParams->func = (void*)ncclSendRecvKernel_copy_i8;
 
-  info->comm->opCount++;
   return ncclSuccess;
 }
 

@@ -100,7 +100,6 @@ ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel
   args.channel = channel;
   args.sliceSteps = 1;
   args.chunkSteps = 1;
-  args.opCount = info->comm->opCount;
   if (info->delta > 0 && info->sendbytes >= 0) {
     int peersend = (info->comm->rank + info->delta) % info->comm->nRanks;
     args.nsteps = DIVUP(info->sendbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
@@ -141,9 +140,7 @@ void* persistentThread(void *comm_) {
       }
     } while (op == NULL);
     op->idle = 0;
-    // opCount >= lastOpCount are part of an ongoing GroupStart/GroupEnd that hasn't started
-    // yet and might be cancelled before they even start. Hold on on those.
-    if (op->state != ncclProxyOpNone && op->opCount < comm->lastOpCount) ret = op->progress(op);
+    if (op->state != ncclProxyOpNone) ret = op->progress(op);
     if (ret != ncclSuccess) {
       comm->fatalError = ret;
       INFO(NCCL_ALL,"%s:%d -> %d [Proxy Thread]", __FILE__, __LINE__, ret);

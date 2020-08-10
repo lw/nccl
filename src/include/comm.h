@@ -34,8 +34,6 @@ struct ncclSendMem {
       uint64_t head;
       char pad1[CACHE_LINE_SIZE-sizeof(uint64_t)];
       void* ptrExchange;
-      char pad2[CACHE_LINE_SIZE-sizeof(void*)];
-      uint64_t opCount;
     };
     char pad3[MEM_ALIGN];
   };
@@ -47,8 +45,6 @@ struct ncclRecvMem {
     struct {
       uint64_t tail;
       char pad1[CACHE_LINE_SIZE-sizeof(uint64_t)];
-      uint64_t opCount;
-      char pad2[CACHE_LINE_SIZE-sizeof(uint64_t)];
       int sizesFifo[NCCL_STEPS];
     };
     char pad4[MEM_ALIGN];
@@ -77,11 +73,6 @@ struct ncclComm {
   bool userStreamSet;
   cudaEvent_t doneEvent;
   bool checkPointers;
-
-  // Counter to make sure collectives match (needed for bcast/reduce
-  // where syncs are not symmetric).
-  uint64_t opCount;
-  uint64_t lastOpCount;
 
   // Buffer size
   int buffSize;
