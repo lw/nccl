@@ -10,8 +10,6 @@
 #include "collectives.h"
 #include "devcomm.h"
 
-extern __device__ volatile uint64_t* ncclShmem;
-
 #define COLL_UNROLL 4
 
 #endif

@@ -27,7 +27,6 @@ struct netSendResources {
   void* mhandles[LOC_COUNT];
   void** mhandlesProto;
   uint64_t step;
-  uint64_t llLastCleaning;
 };
 
 struct netRecvResources {
@@ -42,7 +41,6 @@ struct netRecvResources {
   void* mhandles[LOC_COUNT];
   void** mhandlesProto;
   uint64_t step;
-  uint64_t llLastCleaning;
 };
 
 /* Determine if two peers can communicate with NET */

@@ -22,50 +22,9 @@ extern const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS];
 #define NCCL_MAX_OPS 2048
 #define NCCL_STEPS 8
 
-union ncclLLFifoLine {
-  /* Flags have to be *after* data, because otherwise, an incomplete receive
-     from the network may receive the flag but not the data.
-     Note this is assuming that either we receive contiguous chunks of data
-     (sockets) or data is written with an atomicity of 8 bytes (IB/RDMA). */
-  struct {
-    uint32_t data1;
-    uint32_t flag1;
-    uint32_t data2;
-    uint32_t flag2;
-  };
-  uint64_t v[2];
-  int4 i4;
-};
-
 #define WARP_SIZE 32
 #define MAXCHANNELS 32
 #define NCCL_MAX_NTHREADS 512
-#define NCCL_LL_MAX_NTHREADS NCCL_MAX_NTHREADS
-#define NCCL_LL_LINES_PER_THREAD 8
-#ifdef TEST_LL_CLEANUP
-#define NCCL_LL_CLEAN_MASK 0x078 // Set to 0x100 to disable cleanup
-#define NCCL_LL_FLAG_MAX   0x100
-#define NCCL_LL_FLAG(a) ((uint32_t)((a) % NCCL_LL_FLAG_MAX))
-#else
-#define NCCL_LL_CLEAN_MASK 0x7ffffff8
-#define NCCL_LL_FLAG(a) ((uint32_t)(a))
-#endif
-// Make sure the clean mask will last for at least NCCL_NSTEPS
-static_assert(NCCL_LL_CLEAN_MASK % NCCL_STEPS == 0, "Invalid NCCL_LL_CLEAN_MASK value");
-
-#define NCCL_LL128_LINESIZE 128
-#define NCCL_LL128_LINEELEMS (NCCL_LL128_LINESIZE/sizeof(uint64_t))
-#define NCCL_LL128_DATAELEMS (NCCL_LL128_LINEELEMS-1)
-
-#define NCCL_LL128_MAX_NTHREADS 640
-#define NCCL_LL128_ELEMS_PER_THREAD 120
-
-// Receiving from up to 3 sources is more compute intensive than sending
-// to 3 dests. Use 70% for reduce and 30% for bcast.
-#define NCCL_LL128_SPLIT(nt) ((nt*7/(10*32))*32)
-
-#define NCCL_LL128_SHMEM_ELEMS_PER_THREAD 8
-#define NCCL_LL128_SHMEM_SIZE (NCCL_LL128_SHMEM_ELEMS_PER_THREAD*NCCL_LL128_MAX_NTHREADS)
 
 #define NCCL_DIRECT_GPU 0x01
 #define NCCL_DIRECT_NIC 0x10
@@ -84,7 +43,6 @@ struct ncclConnInfo {
   int *fifo;          // Size fifo for proxy
 
   uint64_t step;      // Keep where we are
-  uint64_t llLastCleaning;
 };
 
 struct ncclConnector {
