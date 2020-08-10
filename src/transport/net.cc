@@ -72,9 +72,7 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
 
   int protoLoc = resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
 
-  int buffSize = send->comm->buffSize;
-  resources->buffSizes[protoLoc] += buffSize;
-
+  resources->buffSizes[protoLoc] = send->comm->buffSize;
   if (resources->buffSizes[LOC_DEVMEM]) {
     NCCLCHECK(ncclCudaCalloc(resources->buffers+LOC_DEVMEM, resources->buffSizes[LOC_DEVMEM]));
   }
@@ -82,11 +80,8 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
     NCCLCHECK(ncclCudaHostCalloc(resources->buffers+LOC_HOSTMEM, resources->buffSizes[LOC_HOSTMEM]));
   }
 
-  int offsets[LOC_COUNT];
-  offsets[LOC_HOSTMEM] = offsets[LOC_DEVMEM] = 0;
   resources->mhandlesProto = resources->mhandles+protoLoc;
-  send->conn.buff = resources->buffers[protoLoc] + offsets[protoLoc];
-  offsets[protoLoc] += buffSize;
+  send->conn.buff = resources->buffers[protoLoc];
 
   INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [send] via NET/%s/%d%s", myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
@@ -112,9 +107,7 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
 
   int protoLoc = resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
 
-  int buffSize = recv->comm->buffSize;
-  resources->buffSizes[protoLoc] += buffSize;
-
+  resources->buffSizes[protoLoc] = recv->comm->buffSize;
   if (resources->buffSizes[LOC_DEVMEM]) {
     NCCLCHECK(ncclCudaCalloc(resources->buffers+LOC_DEVMEM, resources->buffSizes[LOC_DEVMEM]));
   }
@@ -122,11 +115,8 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
     NCCLCHECK(ncclCudaHostCalloc(resources->buffers+LOC_HOSTMEM, resources->buffSizes[LOC_HOSTMEM]));
   }
 
-  int offsets[LOC_COUNT];
-  offsets[LOC_HOSTMEM] = offsets[LOC_DEVMEM] = 0;
   resources->mhandlesProto = resources->mhandles+protoLoc;
-  recv->conn.buff = resources->buffers[protoLoc] + offsets[protoLoc];
-  offsets[protoLoc] += buffSize;
+  recv->conn.buff = resources->buffers[protoLoc];
 
   INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [receive] via NET/%s/%d%s", peerInfo->rank, peerInfo->busId, myInfo->rank, myInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
