@@ -31,7 +31,7 @@ struct ncclProxyArgs {
   int idle;
 
   // Element linking
-  pthread_mutex_t mutex;
+  // pthread_mutex_t mutex;
   struct ncclProxyArgs* next;
   struct ncclProxyArgs* nextPeer;
 };
