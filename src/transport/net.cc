@@ -25,7 +25,7 @@ struct netSendResources {
   char* buffers[LOC_COUNT];
   int buffSizes[LOC_COUNT];
   void* mhandles[LOC_COUNT];
-  void** mhandlesProto[NCCL_NUM_PROTOCOLS];
+  void** mhandlesProto;
   uint64_t step;
   uint64_t llLastCleaning;
 };
@@ -40,7 +40,7 @@ struct netRecvResources {
   char* buffers[LOC_COUNT];
   int buffSizes[LOC_COUNT];
   void* mhandles[LOC_COUNT];
-  void** mhandlesProto[NCCL_NUM_PROTOCOLS];
+  void** mhandlesProto;
   uint64_t step;
   uint64_t llLastCleaning;
 };
@@ -72,17 +72,10 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
   send->conn.opCountLoc = &resources->sendMem->opCount;
   for (int i=0; i<NCCL_STEPS; i++) send->conn.fifo[i] = -1;
 
-  int protoLoc[NCCL_NUM_PROTOCOLS];
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    protoLoc[p] = p != NCCL_PROTO_LL && resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
-  }
+  int protoLoc = resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
 
-  int buffSizes[NCCL_NUM_PROTOCOLS];
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    // Only allocate buffers for simple for p2p connections
-    buffSizes[p] = p != NCCL_PROTO_SIMPLE ? 0 : send->comm->buffSizes[p];
-    resources->buffSizes[protoLoc[p]] += buffSizes[p];
-  }
+  int buffSize = send->comm->buffSize;
+  resources->buffSizes[protoLoc] += buffSize;
 
   if (resources->buffSizes[LOC_DEVMEM]) {
     NCCLCHECK(ncclCudaCalloc(resources->buffers+LOC_DEVMEM, resources->buffSizes[LOC_DEVMEM]));
@@ -93,11 +86,9 @@ ncclResult_t netSendSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
 
   int offsets[LOC_COUNT];
   offsets[LOC_HOSTMEM] = offsets[LOC_DEVMEM] = 0;
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    resources->mhandlesProto[p] = resources->mhandles+protoLoc[p];
-    send->conn.buffs[p] = resources->buffers[protoLoc[p]] + offsets[protoLoc[p]];
-    offsets[protoLoc[p]] += buffSizes[p];
-  }
+  resources->mhandlesProto = resources->mhandles+protoLoc;
+  send->conn.buff = resources->buffers[protoLoc] + offsets[protoLoc];
+  offsets[protoLoc] += buffSize;
 
   INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [send] via NET/%s/%d%s", myInfo->rank, myInfo->busId, peerInfo->rank, peerInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
@@ -121,17 +112,10 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
   recv->conn.head = &resources->sendMem->head;
   recv->conn.opCountRem = &resources->sendMem->opCount;
 
-  int protoLoc[NCCL_NUM_PROTOCOLS];
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    protoLoc[p] = resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
-  }
+  int protoLoc = resources->useGdr ? LOC_DEVMEM : LOC_HOSTMEM;
 
-  int buffSizes[NCCL_NUM_PROTOCOLS];
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    // Only allocate buffers for simple for p2p connections
-    buffSizes[p] = p != NCCL_PROTO_SIMPLE ? 0 : recv->comm->buffSizes[p];
-    resources->buffSizes[protoLoc[p]] += buffSizes[p];
-  }
+  int buffSize = recv->comm->buffSize;
+  resources->buffSizes[protoLoc] += buffSize;
 
   if (resources->buffSizes[LOC_DEVMEM]) {
     NCCLCHECK(ncclCudaCalloc(resources->buffers+LOC_DEVMEM, resources->buffSizes[LOC_DEVMEM]));
@@ -142,11 +126,9 @@ ncclResult_t netRecvSetup(struct ncclTopoSystem* topo, struct ncclPeerInfo* myIn
 
   int offsets[LOC_COUNT];
   offsets[LOC_HOSTMEM] = offsets[LOC_DEVMEM] = 0;
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    resources->mhandlesProto[p] = resources->mhandles+protoLoc[p];
-    recv->conn.buffs[p] = resources->buffers[protoLoc[p]] + offsets[protoLoc[p]];
-    offsets[protoLoc[p]] += buffSizes[p];
-  }
+  resources->mhandlesProto = resources->mhandles+protoLoc;
+  recv->conn.buff = resources->buffers[protoLoc] + offsets[protoLoc];
+  offsets[protoLoc] += buffSize;
 
   INFO(NCCL_INIT|NCCL_NET,"Channel : %d[%lx] -> %d[%lx] [receive] via NET/%s/%d%s", peerInfo->rank, peerInfo->busId, myInfo->rank, myInfo->busId, ncclNetName(), resources->netDev,
       resources->useGdr ? "/GDRDMA" : "");
@@ -235,69 +217,16 @@ ncclResult_t netSendProxy(struct ncclProxyArgs* args) {
     args->state = ncclProxyOpProgress;
   }
   if (args->state == ncclProxyOpProgress) {
-    int p = args->protocol;
-    int stepSize = args->connector->comm->buffSizes[p] / NCCL_STEPS;
-    char* localBuff = args->connector->conn.buffs[p];
-    void* mhandle = *(resources->mhandlesProto[p]);
+    int stepSize = args->connector->comm->buffSize / NCCL_STEPS;
+    char* localBuff = args->connector->conn.buff;
+    void* mhandle = *(resources->mhandlesProto);
     args->idle = 1;
     if (args->head < args->end) {
       int buffSlot = args->tail%NCCL_STEPS;
       if (args->tail < args->end && args->tail < args->head + NCCL_STEPS) {
         volatile int* sizesFifo = resources->recvMem->sizesFifo;
         volatile uint64_t* recvTail = &resources->recvMem->tail;
-        if (args->protocol == NCCL_PROTO_LL128) {
-          if (args->tail < *recvTail) {
-            if (sizesFifo[buffSlot] != -1) {
-              int ready = resources->useGdr;
-              if (!ready) {
-                // When data is in sysmem, we need to wait until all flags are correct since the GPU only
-                // called threadfence()
-                uint64_t flag = args->tail + 1;
-                int nFifoLines = DIVUP(sizesFifo[buffSlot], sizeof(uint64_t)*NCCL_LL128_LINEELEMS);
-                volatile uint64_t* lines = (volatile uint64_t*)(localBuff+buffSlot*stepSize);
-                ready = 1;
-                for (int i=0; i<nFifoLines; i++) {
-                  if (lines[i*NCCL_LL128_LINEELEMS+NCCL_LL128_DATAELEMS] != flag) { ready = 0; break; }
-                }
-              }
-              if (ready) {
-                // Send through network
-                NCCLCHECK(ncclNetIsend(resources->netSendComm, localBuff+buffSlot*stepSize, sizesFifo[buffSlot], mhandle, args->requests+buffSlot));
-                if (args->requests[buffSlot] != NULL) {
-                  sizesFifo[buffSlot] = -1;
-                  // Make sure size is reset to zero before we update the head.
-                  __sync_synchronize();
-                  args->tail += args->sliceSteps;
-                  args->idle = 0;
-                }
-              }
-            }
-          }
-        } else if (args->protocol == NCCL_PROTO_LL) {
-          int size = sizesFifo[buffSlot];
-          if (size != -1) {
-            uint32_t flag = NCCL_LL_FLAG(args->tail + 1);
-            int nFifoLines = DIVUP(size, sizeof(union ncclLLFifoLine));
-            size = nFifoLines * sizeof(union ncclLLFifoLine);
-            union ncclLLFifoLine* lines = (union ncclLLFifoLine*)(localBuff+buffSlot*stepSize);
-            int ready = 1;
-            for (int i=0; i<nFifoLines; i++) {
-              volatile uint32_t *f1 = &lines[i].flag1;
-              volatile uint32_t *f2 = &lines[i].flag2;
-              if (f1[0] != flag || f2[0] != flag) { ready = 0; break; }
-            }
-            if (ready) {
-              NCCLCHECK(ncclNetIsend(resources->netSendComm, lines, size, mhandle, args->requests+buffSlot));
-              if (args->requests[buffSlot] != NULL) {
-                sizesFifo[buffSlot] = -1;
-                // Make sure size is reset to zero before we update the head.
-                __sync_synchronize();
-                args->tail += args->sliceSteps;
-                args->idle = 0;
-              }
-            }
-          }
-        } else if (args->tail < *recvTail) {
+        if (args->tail < *recvTail) {
           // Send through network
           if (sizesFifo[buffSlot] != -1) {
             NCCLCHECK(ncclNetIsend(resources->netSendComm, localBuff+buffSlot*stepSize, sizesFifo[buffSlot], mhandle, args->requests+buffSlot));
@@ -346,10 +275,9 @@ ncclResult_t netRecvProxy(struct ncclProxyArgs* args) {
   }
   if (args->state == ncclProxyOpProgress) {
     args->idle = 1;
-    int p = args->protocol;
-    int stepSize = args->connector->comm->buffSizes[p] / NCCL_STEPS;
-    char* localBuff = args->connector->conn.buffs[p];
-    void* mhandle = *(resources->mhandlesProto[p]);
+    int stepSize = args->connector->comm->buffSize / NCCL_STEPS;
+    char* localBuff = args->connector->conn.buff;
+    void* mhandle = *(resources->mhandlesProto);
     if (args->head < args->end) {
       volatile uint64_t* sendHead = &resources->sendMem->head;
       if ((args->tail < args->head + NCCL_STEPS) && (args->tail < *sendHead + NCCL_STEPS) && (args->tail < args->end)) {
@@ -367,10 +295,8 @@ ncclResult_t netRecvProxy(struct ncclProxyArgs* args) {
         NCCLCHECK(ncclNetTest(args->requests[buffSlot], &done, &size));
         if (done) {
           args->head += args->sliceSteps;
-          if (args->protocol == NCCL_PROTO_SIMPLE) {
-            if (resources->useGdr) NCCLCHECK(ncclNetFlush(resources->netRecvComm, localBuff+buffSlot*stepSize, size, mhandle));
-            resources->recvMem->tail = args->head;
-          }
+          if (resources->useGdr) NCCLCHECK(ncclNetFlush(resources->netRecvComm, localBuff+buffSlot*stepSize, size, mhandle));
+          resources->recvMem->tail = args->head;
           args->idle = 0;
         }
       }

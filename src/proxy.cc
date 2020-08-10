@@ -100,17 +100,16 @@ ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel
   args.channel = channel;
   args.sliceSteps = 1;
   args.chunkSteps = 1;
-  args.protocol = NCCL_PROTO_SIMPLE;
   args.opCount = info->comm->opCount;
   if (info->delta > 0 && info->sendbytes >= 0) {
-    int peersend = (info->comm->rank+info->delta)%info->comm->nRanks;
-    args.nsteps = DIVUP(info->sendbytes, info->comm->buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS/SENDRECV_SLICEFACTOR);
+    int peersend = (info->comm->rank + info->delta) % info->comm->nRanks;
+    args.nsteps = DIVUP(info->sendbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
     if (args.nsteps == 0) args.nsteps = 1;
     NCCLCHECK(SaveProxy<proxySend>(peersend, &args));
   }
   if (info->delta > 0 && info->recvbytes >= 0) {
-    int peerrecv = (info->comm->nRanks+info->comm->rank-info->delta)%info->comm->nRanks;
-    args.nsteps = DIVUP(info->recvbytes, info->comm->buffSizes[NCCL_PROTO_SIMPLE]/NCCL_STEPS/SENDRECV_SLICEFACTOR);
+    int peerrecv = (info->comm->rank - info->delta + info->comm->nRanks) % info->comm->nRanks;
+    args.nsteps = DIVUP(info->recvbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
     if (args.nsteps == 0) args.nsteps = 1;
     NCCLCHECK(SaveProxy<proxyRecv>(peerrecv, &args));
   }

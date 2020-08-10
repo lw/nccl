@@ -85,8 +85,8 @@ struct ncclComm {
   uint64_t opCount;
   uint64_t lastOpCount;
 
-  // Buffer sizes
-  int buffSizes[NCCL_NUM_PROTOCOLS];
+  // Buffer size
+  int buffSize;
 
   // Algorithm/Protocols thresholds
   int maxThreads;

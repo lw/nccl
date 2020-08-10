@@ -39,7 +39,6 @@ std::chrono::high_resolution_clock::time_point ncclEpoch;
 
 const char* ncclFuncStr[0] = { };
 const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS] = { "Tree", "Ring" };
-const char* ncclProtoStr[NCCL_NUM_PROTOCOLS] = { "LL", "LL128", "Simple" };
 
 NCCL_PARAM(GroupCudaStream, "GROUP_CUDA_STREAM", NCCL_GROUP_CUDA_STREAM);
 
@@ -255,12 +254,8 @@ NCCL_PARAM(LlBuffSize, "LL_BUFFSIZE", -2);
 NCCL_PARAM(Ll128BuffSize, "LL128_BUFFSIZE", -2);
 
 static ncclResult_t computeBuffSizes(struct ncclComm* comm) {
-  int64_t envs[NCCL_NUM_PROTOCOLS] = { ncclParamLlBuffSize(), ncclParamLl128BuffSize(), ncclParamBuffSize() };
-  int defaults[NCCL_NUM_PROTOCOLS] = { DEFAULT_LL_BUFFSIZE, DEFAULT_LL128_BUFFSIZE, DEFAULT_BUFFSIZE };
-
-  for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    comm->buffSizes[p] = comm->hostDevComm.buffSizes[p] = envs[p] != -2 ? envs[p] : defaults[p];
-  }
+  int64_t env = ncclParamBuffSize();
+  comm->buffSize = comm->hostDevComm.buffSize = env != -2 ? env : DEFAULT_BUFFSIZE;
   return ncclSuccess;
 }
 

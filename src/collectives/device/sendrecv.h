@@ -37,7 +37,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
   struct ncclDevComm* comm = args->comm;
   struct ncclChannel* channel = comm->channels+blockIdx.x;
 
-  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE]/(sizeof(T)*NCCL_STEPS)/SENDRECV_SLICEFACTOR;
+  const int stepSize = comm->buffSize/(sizeof(T)*NCCL_STEPS)/SENDRECV_SLICEFACTOR;
 
   int nthreadsSplit = nthreads/2;
   // We set NRECV or NSEND to 2 to use different barriers in primitives for the send threads and

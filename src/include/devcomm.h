@@ -19,12 +19,6 @@ extern const char* ncclFuncStr[0];
 #define NCCL_ALGO_RING 1
 extern const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS];
 
-#define NCCL_NUM_PROTOCOLS 3 // Simple/LL/LL128
-#define NCCL_PROTO_LL 0
-#define NCCL_PROTO_LL128 1
-#define NCCL_PROTO_SIMPLE 2
-extern const char* ncclProtoStr[NCCL_NUM_PROTOCOLS];
-
 #define NCCL_MAX_OPS 2048
 #define NCCL_STEPS 8
 
@@ -78,7 +72,7 @@ static_assert(NCCL_LL_CLEAN_MASK % NCCL_STEPS == 0, "Invalid NCCL_LL_CLEAN_MASK 
 
 struct ncclConnInfo {
   // Regular comm mechanism
-  char *buffs[NCCL_NUM_PROTOCOLS]; // Local for recv, remote for send
+  char *buff; // Local for recv, remote for send
   uint64_t *tail;     // Local for recv, remote for send
   uint64_t *head;     // Local for send, remote for recv
   uint64_t *opCountLoc; // opCount of local rank
@@ -158,7 +152,7 @@ typedef enum {
 struct ncclDevComm {
   int rank;
   int nRanks;
-  int buffSizes[NCCL_NUM_PROTOCOLS];
+  int buffSize;
 
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
