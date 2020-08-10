@@ -13,7 +13,7 @@ NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, int peer,
 ncclResult_t ncclSend(const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollSendRecv, "Send",
-    sendbuff, NULL, count, ncclSum, peer, comm, stream, /* Args */
+    sendbuff, NULL, count, peer, comm, stream, /* Args */
     1, 1 };
   return ncclEnqueueCheck(&info);
 }
@@ -23,7 +23,7 @@ NCCL_API(ncclResult_t, ncclRecv, void* recvbuff, size_t count, int peer,
 ncclResult_t ncclRecv(void* recvbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollSendRecv, "Recv",
-    NULL, recvbuff, count, ncclSum, peer, comm, stream, /* Args */
+    NULL, recvbuff, count, peer, comm, stream, /* Args */
     1, 1 };
   return ncclEnqueueCheck(&info);
 }

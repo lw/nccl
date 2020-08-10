@@ -21,8 +21,6 @@ struct ncclProxyArgs {
   int sliceSteps;
   int chunkSteps;
   int nsteps;
-  int protocol;
-  ncclRedOp_t redOp;
   int state;   // add component before this line -- it is left out during initialization
 
   // Internal state

@@ -22,7 +22,6 @@ struct ncclInfo {
   const void* sendbuff;
   void* recvbuff;
   size_t length;
-  ncclRedOp_t op;
   int root;
   ncclComm_t comm;
   cudaStream_t stream;
@@ -30,12 +29,7 @@ struct ncclInfo {
   int chunkSteps;
   int sliceSteps;
   // Computed later
-  int algorithm;
-  int protocol;
-  ncclPattern_t pattern;
   int nThreads;
-  int nstepsPerLoop;
-  int nchunksPerLoop;
   ssize_t sendbytes;
   ssize_t recvbytes;
   uint32_t delta;

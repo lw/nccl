@@ -40,11 +40,6 @@ ncclResult_t ArgsCheck(struct ncclInfo* info) {
     return ncclInvalidArgument;
   }
 
-  if (info->op < 0 || info->op >= ncclNumOps) {
-    WARN("%s : invalid reduction operation %d", info->opName, info->op);
-    return ncclInvalidArgument;
-  }
-
   if (info->comm->checkPointers) {
     if (strcmp(info->opName, "Send") == 0) {
       NCCLCHECK(CudaPtrCheck(info->sendbuff, info->comm, "sendbuff", "Send"));

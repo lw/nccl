@@ -109,7 +109,7 @@ end:
   int peer = info->root;
 
   struct ncclInfo info2 = { ncclCollSendRecv, "SendRecv",
-    info->sendbuff, info->recvbuff, info->length, ncclSum, -1, comm, comm->userStream, /* Args */
+    info->sendbuff, info->recvbuff, info->length, -1, comm, comm->userStream, /* Args */
     1, 1 };
 
   if (info->recvbuff == NULL) {
