@@ -12,8 +12,6 @@ OBJDIR := $(BUILDDIR)/obj/collectives/device
 
 LIBSRCFILES := sendrecv.cu
 
-LIBSRCFILES += functions.cu
-
 DEPFILES   := $(patsubst %.cu, $(OBJDIR)/%.d, $(LIBSRCFILES))
 DEPENDFILES:= $(DEPFILES:%.d=%.dep)
 STATICLIB  := $(OBJDIR)/colldevice.a
@@ -35,7 +33,7 @@ $(OBJDIR)/sendrecv_sum_i8.o : sendrecv.cu $(OBJDIR)/sendrecv.dep
 
 GENOBJS	   := $(OBJDIR)/sendrecv_sum_i8.o
 
-LIBOBJ     := $(GENOBJS) $(OBJDIR)/functions.o
+LIBOBJ     := $(GENOBJS)
 
 -include $(DEPFILES)
 
@@ -55,12 +53,6 @@ $(OBJDIR)/%.dep : %.cu
                 sed -e 's/^ *//' -e 's/$$/:/' >> $@
 	@rm -f $@.tmp
 	@cp $@ $(@:.dep=.d)
-
-# Compiled kernels and collectives with relocatable device code ...
-$(OBJDIR)/functions.o : functions.cu $(OBJDIR)/functions.dep
-	@printf "Compiling  %-35s > %s\n" $< $@
-	mkdir -p `dirname $@`
-	$(NVCC) $(NVCUFLAGS) -dc $< -o $@
 
 # ... and create the device-side linked object with all those.
 $(DEVOBJ) : $(LIBOBJ)

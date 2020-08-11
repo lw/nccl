@@ -4,9 +4,9 @@
  * See LICENSE.txt for license information
  ************************************************************************/
 
+#include "collectives.h"
 #include "devcomm.h"
 #include "primitives.h"
-#include "collectives.h"
 
 #define COLL_UNROLL 4
 

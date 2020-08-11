@@ -5,8 +5,6 @@
  ************************************************************************/
 
 #include "sendrecv.h"
-#include "common.h"
-#include "collectives.h"
 
 __global__ void ncclSendRecvKernel_copy_i8(struct ncclColl firstColl) {
   if (threadIdx.x < firstColl.args.nThreads) {

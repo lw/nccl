@@ -8,8 +8,7 @@
 #define NCCL_PRIMITIVES_H_
 
 #include <type_traits>
-#include "reduce_kernel.h" // for reduction funcs
-#include "common.h"
+#include "copy.h"
 
 #define SPINS_BEFORE_CHECK_ABORT 1000000
 
