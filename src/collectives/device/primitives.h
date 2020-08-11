@@ -7,6 +7,7 @@
 #ifndef NCCL_PRIMITIVES_H_
 #define NCCL_PRIMITIVES_H_
 
+#include <cassert>
 #include <type_traits>
 #include "copy.h"
 
@@ -128,33 +129,28 @@ class ncclPrimitives {
   }
 
   inline __device__ void
-  GenericOpSend(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
-    int offset = 0;
+  GenericOpSend(const T* srcPtr, int nelem) {
+    static_assert(NSEND == 1, "!");
+    assert(nsend == 1);
+
     int sliceSize = stepSize;
     int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
 
-    const T* srcs[1];
-    srcs[0] = srcPtr;
-
-    T* dsts[NSEND];
-    dsts[0] = sendPtr(0);
-    for (int i=1; i<NSEND && i<nsend; i++) dsts[i] = sendPtr(i);
+    const T* src = srcPtr;
+    T* dst = sendPtr(0);
 
     bool syncThread = tid >= nthreads;
 
-    int realSize = max(0, min(dataSize, nelem-offset));
+    int realSize = max(0, min(dataSize, nelem));
     if (!syncThread) {
       waitSend(realSize*sizeof(T));
       if (realSize > 0) {
         subBarrier();
-        static_assert(NSEND == 1, "!");
-        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, 1, srcs[0], nsend, dsts[0], realSize);
+        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, src, dst, realSize);
       }
     }
     barrier();
 
-    /* Send to far first, then close */
-    for (int i=1; i<NSEND && i<nsend; i++) incSend(i);
     incSend(0);
 
     if (syncThread) {
@@ -162,52 +158,39 @@ class ncclPrimitives {
       __syncwarp();
       postSend();
     }
-    srcs[0] += realSize;
-    dsts[0] += sliceSize;
-    for (int i=1; i<NSEND; i++) dsts[i] += sliceSize;
-    offset += realSize;
   }
 
   inline __device__ void
-  GenericOpRecv(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
-    int offset = 0;
+  GenericOpRecv(T* dstPtr, int nelem) {
+    static_assert(NRECV == 1, "!");
+    assert(nrecv == 1);
+
     int sliceSize = stepSize;
     int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
 
-    const T* srcs[NRECV];
-    srcs[0] = recvPtr(0);
-    for (int i=1; i<NRECV && i<nrecv; i++) srcs[i] = recvPtr(i);
-
-    T* dsts[1];
-    dsts[0] = dstPtr;
+    const T* src = recvPtr(0);
+    T* dst = dstPtr;
 
     bool syncThread = tid >= nthreads;
 
-    int realSize = max(0, min(dataSize, nelem-offset));
+    int realSize = max(0, min(dataSize, nelem));
     if (!syncThread) {
       waitRecv();
       if (realSize > 0) {
         subBarrier();
-        static_assert(NRECV == 1, "!");
-        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, nrecv, srcs[0], 1, dsts[0], realSize);
+        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, src, dst, realSize);
       }
     }
     barrier();
 
-    /* Recv from close first, then far */
     incRecv(0);
-    for (int i=1; i<NRECV && i<nrecv; i++) incRecv(i);
 
     if (syncThread) {
       postRecv();
     }
-    srcs[0] += sliceSize;
-    for (int i=1; i<NRECV; i++) srcs[i] += sliceSize;
-    dsts[0] += realSize;
-    offset += realSize;
   }
 
-  __device__ __forceinline__ void loadRecvConn(struct ncclConnInfo* conn, int i, T* directBuff) {
+  __device__ __forceinline__ void loadRecvConn(struct ncclConnInfo* conn, int i) {
     recvBuff[i] = (const T*)conn->buff;
     recvStep[i] = conn->step;
     if (wid == i) recvConn = conn;
@@ -260,12 +243,12 @@ class ncclPrimitives {
 
  public:
   __device__ __forceinline__
-  ncclPrimitives(const int tid, const int nthreads, int* recvPeers, int* sendPeers, T* directBuff, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
+  ncclPrimitives(const int tid, const int nthreads, int* recvPeers, int* sendPeers, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
     : comm(comm), tid(tid), nthreads(nthreads), wid(tid%WARP_SIZE), stepSize(stepSize) {
     // Make sure step is updated before we read it.
     barrier();
 
-    for (int i=0; i<NRECV && recvPeers[i] >= 0; i++) loadRecvConn(&channel->devPeers[recvPeers[i]].recv.conn, i, directBuff);
+    for (int i=0; i<NRECV && recvPeers[i] >= 0; i++) loadRecvConn(&channel->devPeers[recvPeers[i]].recv.conn, i);
     for (int i=0; i<NSEND && sendPeers[i] >= 0; i++) loadSendConn(&channel->devPeers[sendPeers[i]].send.conn, i);
     loadRecvSync();
     loadSendSync();
@@ -273,12 +256,12 @@ class ncclPrimitives {
 
   __device__ __forceinline__ void
   send(const T* src, int nelem) {
-    GenericOpSend(src, NULL, nelem, 0);
+    GenericOpSend(src, nelem);
   }
 
   __device__ __forceinline__ void
   recv(T* dst, int nelem) {
-    GenericOpRecv(NULL, dst, nelem, 0);
+    GenericOpRecv(dst, nelem);
   }
 
   __device__ __forceinline__ ~ncclPrimitives() {
