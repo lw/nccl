@@ -41,10 +41,6 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
   const int stepSize = comm->buffSize / NCCL_STEPS / SENDRECV_SLICEFACTOR;
 
   int nthreadsSplit = nthreads/2;
-  // We set NRECV or NSEND to 2 to use different barriers in primitives for the send threads and
-  // receive threads, but then we define all peers to -1 since sender threads don't receive and
-  // receive threads don't send.
-  int peerNone[2] = {-1,-1};
 
   if (tid < nthreadsSplit + WARP_SIZE ) {
     const ssize_t sendSize = args->sendCount;
@@ -52,7 +48,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
 
     int peer = (comm->rank+(int)args->delta)%comm->nRanks;
     ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/2, /*NSEND=*/1>
-      prims(tid, nthreadsSplit, peerNone, &peer, stepSize*4, channel, comm);
+      prims(tid, nthreadsSplit, -1, peer, stepSize*4, channel, comm);
 
     if (sendSize == 0) {
       prims.send(sendbuff, 0);
@@ -70,7 +66,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
 
     int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
     ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/1, /*NSEND=*/2>
-      prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, &peer, peerNone, stepSize*4, channel, comm);
+      prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, peer, -1, stepSize*4, channel, comm);
 
     if (recvSize == 0) {
       prims.recv(recvbuff, 0);
