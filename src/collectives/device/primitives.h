@@ -51,7 +51,7 @@ class SendPrimitive {
   uint32_t spins = 0;
   uint32_t abort = 0;
 
-  inline __device__ int checkAbort(int i, int send) {
+  inline __device__ int checkAbort() {
     spins++;
     if (abort == 0 && spins == SPINS_BEFORE_CHECK_ABORT) {
       abort = *(comm->abortFlag);
@@ -65,7 +65,9 @@ class SendPrimitive {
     if (sendConnHeadPtr) {
       while (sendConnHeadCache + NCCL_STEPS < sendConnHead + 1) {
         sendConnHeadCache = *sendConnHeadPtr;
-        if (checkAbort(wid, 1)) break;
+        if (checkAbort()) {
+          break;
+        }
       }
       if (sendConnFifoPtr) {
         sendConnFifoPtr[sendConnHead%NCCL_STEPS] = nbytes;
@@ -74,16 +76,30 @@ class SendPrimitive {
     }
   }
 
-  inline __device__ void incSend() {
-    sendStep += 1;
+ public:
+  __device__ __forceinline__
+  SendPrimitive(const int tid, const int nthreads, int sendPeer, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
+    : comm(comm), tid(tid), nthreads(nthreads), wid(tid%WARP_SIZE), stepSize(stepSize) {
+    // Make sure step is updated before we read it.
+    barrier();
+
+    struct ncclConnInfo* conn = &channel->devPeers[sendPeer].send.conn;
+    sendBuff = (T*)conn->buff;
+    sendStep = conn->step;
+    if (wid == 0) sendConn = conn;
+    if (wid == 0) sendConnTail = sendConnHead = sendStep; // Make sure we set this after rounding up
+    if (tid == 0) {
+      sendConnHeadPtr = sendConn->head;
+      sendConnHeadCache = *sendConnHeadPtr;
+      sendConnFifoPtr = sendConn->fifo;
+    }
+    if (tid >= nthreads && wid == 0) {
+      sendConnTailPtr = sendConn->tail;
+    }
   }
 
-  inline __device__ void postSend() {
-    if (sendConnTailPtr) *sendConnTailPtr = sendConnTail += 1;
-  }
-
-  inline __device__ void
-  GenericOpSend(const T* srcPtr, int nelem) {
+  __device__ __forceinline__ void
+  send(const T* srcPtr, int nelem) {
     int sliceSize = stepSize;
     int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
 
@@ -102,58 +118,24 @@ class SendPrimitive {
     }
     barrier();
 
-    incSend();
+    sendStep += 1;
 
     if (syncThread) {
-      if (realSize > 0 && wid == 0) __threadfence_system();
+      if (realSize > 0 && wid == 0) {
+        __threadfence_system();
+      }
       __syncwarp();
-      postSend();
+      if (sendConnTailPtr) {
+        *sendConnTailPtr = sendConnTail += 1;
+      }
     }
   }
 
-  __device__ __forceinline__ void loadSendConn(struct ncclConnInfo* conn) {
-    sendBuff = (T*)conn->buff;
-    sendStep = conn->step;
-    if (wid == 0) sendConn = conn;
-    if (wid == 0) sendConnTail = sendConnHead = sendStep; // Make sure we set this after rounding up
-  }
-  __device__ __forceinline__ void loadSendSync() {
-    if (tid == 0) {
-      sendConnHeadPtr = sendConn->head;
-      sendConnHeadCache = *sendConnHeadPtr;
-      sendConnFifoPtr = sendConn->fifo;
-    }
-    if (tid >= nthreads && wid == 0) {
-      sendConnTailPtr = sendConn->tail;
-    }
-  }
-
-  __device__ __forceinline__ void saveSendSync() {
+  __device__ __forceinline__ ~SendPrimitive() {
     if (tid == 0) {
       sendConn->step = sendConnHead;
       __threadfence_system();
     }
-  }
-
- public:
-  __device__ __forceinline__
-  SendPrimitive(const int tid, const int nthreads, int sendPeer, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
-    : comm(comm), tid(tid), nthreads(nthreads), wid(tid%WARP_SIZE), stepSize(stepSize) {
-    // Make sure step is updated before we read it.
-    barrier();
-
-    loadSendConn(&channel->devPeers[sendPeer].send.conn);
-    loadSendSync();
-  }
-
-  __device__ __forceinline__ void
-  send(const T* src, int nelem) {
-    GenericOpSend(src, nelem);
-  }
-
-  __device__ __forceinline__ ~SendPrimitive() {
-    // Save steps for the next operation
-    saveSendSync();
   }
 };
 
@@ -194,7 +176,7 @@ class RecvPrimitive {
   uint32_t spins = 0;
   uint32_t abort = 0;
 
-  inline __device__ int checkAbort(int i, int send) {
+  inline __device__ int checkAbort() {
     spins++;
     if (abort == 0 && spins == SPINS_BEFORE_CHECK_ABORT) {
       abort = *(comm->abortFlag);
@@ -208,22 +190,39 @@ class RecvPrimitive {
     if (recvConnTailPtr) {
       while (recvConnTailCache < recvConnTail + 1) {
         recvConnTailCache = *recvConnTailPtr;
-        if (checkAbort(wid, 0)) break;
+        if (checkAbort()) {
+          break;
+        }
       }
       recvConnTail += 1;
     }
   }
 
-  inline __device__ void incRecv() {
-    recvStep += 1;
+ public:
+  __device__ __forceinline__
+  RecvPrimitive(const int tid, const int nthreads, int recvPeer, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
+    : comm(comm), tid(tid), nthreads(nthreads), wid(tid%WARP_SIZE), stepSize(stepSize) {
+    // Make sure step is updated before we read it.
+    barrier();
+
+    struct ncclConnInfo* conn = &channel->devPeers[recvPeer].recv.conn;
+    recvBuff = (const T*)conn->buff;
+    recvStep = conn->step;
+    if (wid == 0) recvConn = conn;
+    if (wid == 0) recvConnTail = recvConnHead = recvStep; // Make sure we set this after rounding up
+    if (tid >= WARP_SIZE && tid < 2 * WARP_SIZE && wid == 0) {
+      recvConnTailPtr = recvConn->tail;
+      recvConnTailCache = *recvConnTailPtr;
+    }
+    if (tid >= nthreads && wid == 0) {
+      recvConnHeadPtr = recvConn->head;
+      // Return credits in case we rounded up.
+      *recvConnHeadPtr = recvConnHead;
+    }
   }
 
-  inline __device__ void postRecv() {
-    if (recvConnHeadPtr) *recvConnHeadPtr = recvConnHead += 1;
-  }
-
-  inline __device__ void
-  GenericOpRecv(T* dstPtr, int nelem) {
+  __device__ __forceinline__ void
+  recv(T* dstPtr, int nelem) {
     int sliceSize = stepSize;
     int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
 
@@ -242,57 +241,20 @@ class RecvPrimitive {
     }
     barrier();
 
-    incRecv();
+    recvStep += 1;
 
     if (syncThread) {
-      postRecv();
+      if (recvConnHeadPtr) {
+        *recvConnHeadPtr = recvConnHead += 1;
+      }
     }
   }
 
-  __device__ __forceinline__ void loadRecvConn(struct ncclConnInfo* conn) {
-    recvBuff = (const T*)conn->buff;
-    recvStep = conn->step;
-    if (wid == 0) recvConn = conn;
-    if (wid == 0) recvConnTail = recvConnHead = recvStep; // Make sure we set this after rounding up
-  }
-  __device__ __forceinline__ void loadRecvSync() {
-    if (tid >= WARP_SIZE && tid < 2 * WARP_SIZE && wid == 0) {
-      recvConnTailPtr = recvConn->tail;
-      recvConnTailCache = *recvConnTailPtr;
-    }
-    if (tid >= nthreads && wid == 0) {
-      recvConnHeadPtr = recvConn->head;
-      // Return credits in case we rounded up.
-      *recvConnHeadPtr = recvConnHead;
-    }
-  }
-
-  __device__ __forceinline__ void saveRecvSync() {
+  __device__ __forceinline__ ~RecvPrimitive() {
     if (tid >= nthreads && wid == 0) {
       recvConn->step = recvConnHead;
       __threadfence_system();
     }
-  }
-
- public:
-  __device__ __forceinline__
-  RecvPrimitive(const int tid, const int nthreads, int recvPeer, int stepSize, struct ncclChannel* channel, struct ncclDevComm* comm)
-    : comm(comm), tid(tid), nthreads(nthreads), wid(tid%WARP_SIZE), stepSize(stepSize) {
-    // Make sure step is updated before we read it.
-    barrier();
-
-    loadRecvConn(&channel->devPeers[recvPeer].recv.conn);
-    loadRecvSync();
-  }
-
-  __device__ __forceinline__ void
-  recv(T* dst, int nelem) {
-    GenericOpRecv(dst, nelem);
-  }
-
-  __device__ __forceinline__ ~RecvPrimitive() {
-    // Save steps for the next operation
-    saveRecvSync();
   }
 };
 
