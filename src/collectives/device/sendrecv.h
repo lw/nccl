@@ -47,8 +47,8 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     if (sendSize < 0) return;
 
     int peer = (comm->rank+(int)args->delta)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/2, /*NSEND=*/1>
-      prims(tid, nthreadsSplit, -1, peer, stepSize*4, channel, comm);
+    SendPrimitive<COLL_UNROLL, int8_t>
+      prims(tid, nthreadsSplit, peer, stepSize*4, channel, comm);
 
     if (sendSize == 0) {
       prims.send(sendbuff, 0);
@@ -65,8 +65,8 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     if (recvSize < 0) return;
 
     int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/1, /*NSEND=*/2>
-      prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, peer, -1, stepSize*4, channel, comm);
+    RecvPrimitive<COLL_UNROLL, int8_t>
+      prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, peer, stepSize*4, channel, comm);
 
     if (recvSize == 0) {
       prims.recv(recvbuff, 0);
