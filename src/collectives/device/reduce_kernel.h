@@ -11,11 +11,4 @@
 #include "common_kernel.h"
 #include <limits>
 
-template<typename T>
-struct FuncSum {
-  __device__ T operator()(const T x, const T y) const {
-    return x + y;
-  }
-};
-
 #endif // REDUCE_KERNEL_H_

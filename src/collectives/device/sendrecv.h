@@ -28,7 +28,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
       for (size_t offset=0; offset<args->sendCount; offset += blockSize) {
         size_t remaining = args->sendCount - offset;
         if (remaining < blockSize) blockSize = remaining;
-        ReduceOrCopyMulti<COLL_UNROLL, FuncSum<int8_t>, int8_t>(tid, nthreads, 1, sendbuff, 1, recvbuff, blockSize);
+        ReduceOrCopyMulti<COLL_UNROLL, int8_t>(tid, nthreads, 1, sendbuff, 1, recvbuff, blockSize);
         sendbuff += blockSize; recvbuff += blockSize;
       }
     }
@@ -51,7 +51,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     if (sendSize < 0) return;
 
     int peer = (comm->rank+(int)args->delta)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/2, /*NSEND=*/1, FuncSum<int8_t>>
+    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/2, /*NSEND=*/1>
       prims(tid, nthreadsSplit, peerNone, &peer, recvbuff, stepSize*4, channel, comm);
 
     if (sendSize == 0) {
@@ -69,7 +69,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     if (recvSize < 0) return;
 
     int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/1, /*NSEND=*/2, FuncSum<int8_t>>
+    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/1, /*NSEND=*/2>
       prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, &peer, peerNone, recvbuff, stepSize*4, channel, comm);
 
     if (recvSize == 0) {

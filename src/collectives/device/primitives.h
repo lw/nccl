@@ -14,7 +14,7 @@
 #define SPINS_BEFORE_CHECK_ABORT 1000000
 
 // Implementation of primitive types
-template <int UNROLL, typename T, int NRECV, int NSEND, class FUNC>
+template <int UNROLL, typename T, int NRECV, int NSEND>
 class ncclPrimitives {
  private:
   const int tid;
@@ -149,7 +149,7 @@ class ncclPrimitives {
       if (realSize > 0) {
         subBarrier();
         static_assert(NSEND == 1, "!");
-        ReduceOrCopyMulti<UNROLL, FUNC, T>(tid, nthreads, 1, srcs[0], nsend, dsts[0], realSize);
+        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, 1, srcs[0], nsend, dsts[0], realSize);
       }
     }
     barrier();
@@ -190,7 +190,7 @@ class ncclPrimitives {
       if (realSize > 0) {
         subBarrier();
         static_assert(NRECV == 1, "!");
-        ReduceOrCopyMulti<UNROLL, FUNC, T>(tid, nthreads, nrecv, srcs[0], 1, dsts[0], realSize);
+        ReduceOrCopyMulti<UNROLL, T>(tid, nthreads, nrecv, srcs[0], 1, dsts[0], realSize);
       }
     }
     barrier();
