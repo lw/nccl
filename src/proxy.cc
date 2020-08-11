@@ -13,12 +13,6 @@
 
 enum { proxyRecv=0, proxySend=1 };
 
-#define PROXYARGS_ALLOCATE_SIZE 32
-struct ncclProxyPool {
-  struct ncclProxyPool *next;
-  struct ncclProxyArgs elems[PROXYARGS_ALLOCATE_SIZE];
-};
-
 static ncclResult_t allocateArgs(struct ncclComm* comm, struct ncclProxyArgs** argsptr) {
   struct ncclProxyState* state = &comm->proxyState;
   struct ncclProxyArgs* elem;
@@ -155,19 +149,19 @@ void* persistentThread(void *comm_) {
       if (next->nextPeer) {
         // Replace next by its next per-peer element.
         next = next->nextPeer;
-        if (op != freeOp) {
+        if (op != freeOp) { // Circular list has > 1 elem
           next->next = freeOp->next;
           op->next = next;
-        } else {
+        } else { // Circular list has only 1 elem
           next->next = next;
         }
       } else {
         // Remove next from circular list
         next->connector->proxyAppend = NULL;
-        if (op != freeOp) {
+        if (op != freeOp) { // Circular list has > 1 elem
           next = next->next;
           op->next = next;
-        } else {
+        } else { // Circular list has only 1 elem
           next = NULL;
         }
       }

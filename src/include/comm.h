@@ -32,8 +32,6 @@ struct ncclSendMem {
   union {
     struct {
       uint64_t head;
-      char pad1[CACHE_LINE_SIZE-sizeof(uint64_t)];
-      void* ptrExchange;
     };
     char pad3[MEM_ALIGN];
   };

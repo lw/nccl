@@ -10,6 +10,4 @@
 #include "collectives.h"
 #include "devcomm.h"
 
-#define COLL_UNROLL 4
-
 #endif

@@ -36,7 +36,12 @@ struct ncclProxyArgs {
   struct ncclProxyArgs* nextPeer;
 };
 
-struct ncclProxyPool;
+#define PROXYARGS_ALLOCATE_SIZE 32
+struct ncclProxyPool {
+  struct ncclProxyPool *next;
+  struct ncclProxyArgs elems[PROXYARGS_ALLOCATE_SIZE];
+};
+
 struct ncclProxyState {
   pthread_cond_t cond;
   pthread_mutex_t mutex;

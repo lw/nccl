@@ -26,7 +26,6 @@ extern const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS];
 #define MAXCHANNELS 32
 #define NCCL_MAX_NTHREADS 512
 
-#define NCCL_DIRECT_GPU 0x01
 #define NCCL_DIRECT_NIC 0x10
 
 struct ncclConnInfo {
@@ -36,7 +35,6 @@ struct ncclConnInfo {
   uint64_t *head;     // Local for send, remote for recv
 
   int direct;         // Direct communication
-  void **ptrExchange; // Pointer exchange for direct communication
 
   int *fifo;          // Size fifo for proxy
 
