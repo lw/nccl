@@ -13,24 +13,6 @@
 
 #define SPINS_BEFORE_CHECK_ABORT 1000000
 
-// Unroll unconditionally the first send/recv since nsend/nrecv should be at
-// least 1 if SEND/RECV is set.
-#define FOR_SEND(func, ...) do { \
-  if (SEND) { \
-    /* Send to far first, then close */ \
-    for (int i=1; i<NSEND && i<nsend; i++) func(i, ##__VA_ARGS__); \
-    func(0, ##__VA_ARGS__); \
-  } \
-} while (0)
-
-#define FOR_RECV(func, ...) do { \
-  if (RECV) { \
-    /* Recv from close first, then far */ \
-    func(0, ##__VA_ARGS__); \
-    for (int i=1; i<NRECV && i<nrecv; i++) func(i, ##__VA_ARGS__); \
-  } \
-} while (0)
-
 // Implementation of primitive types
 template <int UNROLL, typename T, int NRECV, int NSEND, class FUNC>
 class ncclPrimitives {
@@ -62,10 +44,21 @@ class ncclPrimitives {
   T* sendBuff[NSEND];
   struct ncclDevComm* comm;
 
-  inline __device__ int recvOffset(int i) { return (recvStep[i]%NCCL_STEPS)*stepSize; }
-  inline __device__ int sendOffset(int i) { return (sendStep[i]%NCCL_STEPS)*stepSize; }
-  inline __device__ const T* recvPtr(int i) { return ((const T*)recvBuff[i])+recvOffset(i); }
-  inline __device__ T* sendPtr(int i) { return ((T*)sendBuff[i])+sendOffset(i); }
+  inline __device__ int recvOffset(int i) {
+    return (recvStep[i]%NCCL_STEPS)*stepSize;
+  }
+
+  inline __device__ int sendOffset(int i) {
+    return (sendStep[i]%NCCL_STEPS)*stepSize;
+  }
+
+  inline __device__ const T* recvPtr(int i) {
+    return ((const T*)recvBuff[i])+recvOffset(i);
+  }
+
+  inline __device__ T* sendPtr(int i) {
+    return ((T*)sendBuff[i])+sendOffset(i);
+  }
 
   inline __device__ void barrier() {
     if (NSEND>NRECV) {
@@ -122,6 +115,7 @@ class ncclPrimitives {
   inline __device__ void incRecv(int i) {
     recvStep[i] += 1;
   }
+
   inline __device__ void postRecv() {
     if (recvConnHeadPtr) *recvConnHeadPtr = recvConnHead += 1;
   }
@@ -129,57 +123,88 @@ class ncclPrimitives {
   inline __device__ void incSend(int i) {
     sendStep[i] += 1;
   }
+
   inline __device__ void postSend() {
     if (sendConnTailPtr) *sendConnTailPtr = sendConnTail += 1;
   }
 
-  template <int RECV, int SEND, int SRC, int DST>
+  template <int RECV=0, int SEND=1, int SRC=1, int DST=0>
   inline __device__ void
-  GenericOp(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
+  GenericOpSend(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
     int offset = 0;
     int sliceSize = stepSize;
     int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
 
-    const T* srcs[RECV*NRECV+SRC];
-    srcs[0] = SRC ? srcPtr : recvPtr(0);
-    if (RECV) {
-      if (SRC) srcs[1] = recvPtr(0);
-      for (int i=1; i<NRECV && i<nrecv; i++) srcs[SRC+i] = recvPtr(i);
-    }
+    const T* srcs[1];
+    srcs[0] = srcPtr;
 
-    T* dsts[SEND*NSEND+DST];
-    dsts[0] = DST ? dstPtr : sendPtr(0);
-    if (SEND) {
-      if (DST) dsts[1] = sendPtr(0);
-      for (int i=1; i<NSEND && i<nsend; i++) dsts[DST+i] = sendPtr(i);
-    }
+    T* dsts[NSEND];
+    dsts[0] = sendPtr(0);
+    for (int i=1; i<NSEND && i<nsend; i++) dsts[i] = sendPtr(i);
 
     bool syncThread = tid >= nthreads;
 
     int realSize = max(0, min(dataSize, nelem-offset));
     if (!syncThread) {
-      if (SEND) waitSend(realSize*sizeof(T));
-      if (RECV) waitRecv();
+      waitSend(realSize*sizeof(T));
       if (realSize > 0) {
         subBarrier();
-        ReduceOrCopyMulti<UNROLL, FUNC, T, RECV+SRC, RECV*NRECV+SRC, SEND+DST, SEND*NSEND+DST>(tid, nthreads, RECV*nrecv+SRC, srcs, SEND*nsend+DST, dsts, realSize);
+        ReduceOrCopyMulti<UNROLL, FUNC, T, 1, 1, 1, NSEND>(tid, nthreads, 1, srcs, nsend, dsts, realSize);
       }
     }
     barrier();
-    FOR_SEND(incSend);
-    FOR_RECV(incRecv);
+
+    /* Send to far first, then close */
+    for (int i=1; i<NSEND && i<nsend; i++) incSend(i);
+    incSend(0);
+
     if (syncThread) {
-      if (SEND) {
-        if (realSize > 0 && wid == 0) __threadfence_system();
-        __syncwarp();
-        postSend();
-      }
-      if (RECV) postRecv();
+      if (realSize > 0 && wid == 0) __threadfence_system();
+      __syncwarp();
+      postSend();
     }
-    srcs[0] += SRC ? realSize : sliceSize;
-    for (int i=1-SRC; i<RECV*NRECV; i++) srcs[SRC+i] += sliceSize;
-    dsts[0] += DST ? realSize : sliceSize;
-    for (int i=1-DST; i<SEND*NSEND; i++) dsts[DST+i] += sliceSize;
+    srcs[0] += realSize;
+    dsts[0] += sliceSize;
+    for (int i=1; i<NSEND; i++) dsts[i] += sliceSize;
+    offset += realSize;
+  }
+
+  template <int RECV=1, int SEND=0, int SRC=0, int DST=1>
+  inline __device__ void
+  GenericOpRecv(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
+    int offset = 0;
+    int sliceSize = stepSize;
+    int dataSize = max(DIVUP(nelem, 16)*16, sliceSize/32);
+
+    const T* srcs[NRECV];
+    srcs[0] = recvPtr(0);
+    for (int i=1; i<NRECV && i<nrecv; i++) srcs[i] = recvPtr(i);
+
+    T* dsts[1];
+    dsts[0] = dstPtr;
+
+    bool syncThread = tid >= nthreads;
+
+    int realSize = max(0, min(dataSize, nelem-offset));
+    if (!syncThread) {
+      waitRecv();
+      if (realSize > 0) {
+        subBarrier();
+        ReduceOrCopyMulti<UNROLL, FUNC, T, 1, NRECV, 1, 1>(tid, nthreads, nrecv, srcs, 1, dsts, realSize);
+      }
+    }
+    barrier();
+
+    /* Recv from close first, then far */
+    incRecv(0);
+    for (int i=1; i<NRECV && i<nrecv; i++) incRecv(i);
+
+    if (syncThread) {
+      postRecv();
+    }
+    srcs[0] += sliceSize;
+    for (int i=1; i<NRECV; i++) srcs[i] += sliceSize;
+    dsts[0] += realSize;
     offset += realSize;
   }
 
@@ -249,12 +274,12 @@ class ncclPrimitives {
 
   __device__ __forceinline__ void
   send(const T* src, int nelem) {
-    GenericOp<0, 1, 1, 0>(src, NULL, nelem, 0);
+    GenericOpSend<0, 1, 1, 0>(src, NULL, nelem, 0);
   }
 
   __device__ __forceinline__ void
   recv(T* dst, int nelem) {
-    GenericOp<1, 0, 0, 1>(NULL, dst, nelem, 0);
+    GenericOpRecv<1, 0, 0, 1>(NULL, dst, nelem, 0);
   }
 
   __device__ __forceinline__ ~ncclPrimitives() {
