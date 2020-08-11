@@ -128,7 +128,6 @@ class ncclPrimitives {
     if (sendConnTailPtr) *sendConnTailPtr = sendConnTail += 1;
   }
 
-  template <int RECV=0, int SEND=1, int SRC=1, int DST=0>
   inline __device__ void
   GenericOpSend(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
     int offset = 0;
@@ -149,7 +148,8 @@ class ncclPrimitives {
       waitSend(realSize*sizeof(T));
       if (realSize > 0) {
         subBarrier();
-        ReduceOrCopyMulti<UNROLL, FUNC, T, 1, 1, 1, NSEND>(tid, nthreads, 1, srcs, nsend, dsts, realSize);
+        static_assert(NSEND == 1, "!");
+        ReduceOrCopyMulti<UNROLL, FUNC, T>(tid, nthreads, 1, srcs[0], nsend, dsts[0], realSize);
       }
     }
     barrier();
@@ -169,7 +169,6 @@ class ncclPrimitives {
     offset += realSize;
   }
 
-  template <int RECV=1, int SEND=0, int SRC=0, int DST=1>
   inline __device__ void
   GenericOpRecv(const T* srcPtr, T* dstPtr, int nelem, ssize_t directOffset) {
     int offset = 0;
@@ -190,7 +189,8 @@ class ncclPrimitives {
       waitRecv();
       if (realSize > 0) {
         subBarrier();
-        ReduceOrCopyMulti<UNROLL, FUNC, T, 1, NRECV, 1, 1>(tid, nthreads, nrecv, srcs, 1, dsts, realSize);
+        static_assert(NRECV == 1, "!");
+        ReduceOrCopyMulti<UNROLL, FUNC, T>(tid, nthreads, nrecv, srcs[0], 1, dsts[0], realSize);
       }
     }
     barrier();
@@ -274,12 +274,12 @@ class ncclPrimitives {
 
   __device__ __forceinline__ void
   send(const T* src, int nelem) {
-    GenericOpSend<0, 1, 1, 0>(src, NULL, nelem, 0);
+    GenericOpSend(src, NULL, nelem, 0);
   }
 
   __device__ __forceinline__ void
   recv(T* dst, int nelem) {
-    GenericOpRecv<1, 0, 0, 1>(NULL, dst, nelem, 0);
+    GenericOpRecv(NULL, dst, nelem, 0);
   }
 
   __device__ __forceinline__ ~ncclPrimitives() {

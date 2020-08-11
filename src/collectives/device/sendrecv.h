@@ -28,7 +28,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
       for (size_t offset=0; offset<args->sendCount; offset += blockSize) {
         size_t remaining = args->sendCount - offset;
         if (remaining < blockSize) blockSize = remaining;
-        ReduceOrCopyMulti<COLL_UNROLL, FuncSum<int8_t>, int8_t, 1, 1, 1, 1>(tid, nthreads, 1, &sendbuff, 1, &recvbuff, blockSize);
+        ReduceOrCopyMulti<COLL_UNROLL, FuncSum<int8_t>, int8_t>(tid, nthreads, 1, sendbuff, 1, recvbuff, blockSize);
         sendbuff += blockSize; recvbuff += blockSize;
       }
     }
@@ -51,32 +51,36 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     if (sendSize < 0) return;
 
     int peer = (comm->rank+(int)args->delta)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, 2, 1, FuncSum<int8_t>>
+    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/2, /*NSEND=*/1, FuncSum<int8_t>>
       prims(tid, nthreadsSplit, peerNone, &peer, recvbuff, stepSize*4, channel, comm);
 
     if (sendSize == 0) {
       prims.send(sendbuff, 0);
-    } else for (ssize_t offset = 0; offset < sendSize; offset += stepSize) {
-      int realChunkSize = min(stepSize, sendSize-offset);
-      ALIGN_SIZE(realChunkSize, nthreads * sizeof(uint64_t));
-      int nelem = min(realChunkSize, sendSize-offset);
-      prims.send(sendbuff+offset, nelem);
+    } else {
+      for (ssize_t offset = 0; offset < sendSize; offset += stepSize) {
+        int realChunkSize = min(stepSize, sendSize-offset);
+        ALIGN_SIZE(realChunkSize, nthreads * sizeof(uint64_t));
+        int nelem = min(realChunkSize, sendSize-offset);
+        prims.send(sendbuff+offset, nelem);
+      }
     }
   } else {
     const ssize_t recvSize = args->recvCount;
     if (recvSize < 0) return;
 
     int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
-    ncclPrimitives<COLL_UNROLL, int8_t, 1, 2, FuncSum<int8_t>>
+    ncclPrimitives<COLL_UNROLL, int8_t, /*NRECV=*/1, /*NSEND=*/2, FuncSum<int8_t>>
       prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, &peer, peerNone, recvbuff, stepSize*4, channel, comm);
 
     if (recvSize == 0) {
       prims.recv(recvbuff, 0);
-    } else for (ssize_t offset = 0; offset < recvSize; offset += stepSize) {
-      int realChunkSize = min(stepSize, recvSize-offset);
-      ALIGN_SIZE(realChunkSize, nthreads * sizeof(uint64_t));
-      int nelem = min(realChunkSize, recvSize-offset);
-      prims.recv(recvbuff+offset, nelem);
+    } else {
+      for (ssize_t offset = 0; offset < recvSize; offset += stepSize) {
+        int realChunkSize = min(stepSize, recvSize-offset);
+        ALIGN_SIZE(realChunkSize, nthreads * sizeof(uint64_t));
+        int nelem = min(realChunkSize, recvSize-offset);
+        prims.recv(recvbuff+offset, nelem);
+      }
     }
   }
 }
