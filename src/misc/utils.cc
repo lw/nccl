@@ -110,7 +110,6 @@ uint64_t getHostHash(void) {
   // Make sure the string is terminated
   hostHash[sizeof(hostHash)-1]='\0';
 
-  TRACE(NCCL_INIT,"unique hostname '%s'", hostHash);
 
   return getHash(hostHash, strlen(hostHash));
 }
@@ -130,7 +129,6 @@ uint64_t getPidHash(void) {
   if (len < 0) len = 0;
 
   pname[plen+len]='\0';
-  TRACE(NCCL_INIT,"unique PID '%s'", pname);
 
   return getHash(pname, strlen(pname));
 }

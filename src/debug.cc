@@ -114,9 +114,6 @@ void ncclDebugInit() {
     }
   }
 
-#ifdef ENABLE_TRACE
-  ncclEpoch = std::chrono::high_resolution_clock::now();
-#endif
   pthread_mutex_unlock(&ncclDebugLock);
 }
 
@@ -147,14 +144,6 @@ void ncclDebugLog(ncclDebugLogLevel level, unsigned long flags, const char *file
   else if (level == NCCL_LOG_INFO && (flags & ncclDebugMask))
     len = snprintf(buffer, sizeof(buffer),
         "%s:%d:%d [%d] NCCL INFO ", hostname, pid, tid, cudaDev);
-#ifdef ENABLE_TRACE
-  else if (level == NCCL_LOG_TRACE && (flags & ncclDebugMask)) {
-    auto delta = std::chrono::high_resolution_clock::now() - ncclEpoch;
-    double timestamp = std::chrono::duration_cast<std::chrono::duration<double>>(delta).count()*1000;
-    len = snprintf(buffer, sizeof(buffer),
-        "%s:%d:%d [%d] %f %s:%d NCCL TRACE ", hostname, pid, tid, cudaDev, timestamp, filefunc, line);
-  }
-#endif
   if (len) {
     va_list vargs;
     va_start(vargs, fmt);

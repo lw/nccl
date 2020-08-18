@@ -83,10 +83,6 @@ else
 .SILENT:
 endif
 
-ifneq ($(TRACE), 0)
-CXXFLAGS  += -DENABLE_TRACE
-endif
-
 ifneq ($(KEEP), 0)
 NVCUFLAGS += -keep
 endif

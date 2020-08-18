@@ -63,9 +63,6 @@ static inline int envSocketFamily(void) {
 }
 
 static int findInterfaces(const char* prefixList, char* names, union socketAddress *addrs, int sock_family, int maxIfNameSize, int maxIfs) {
-#ifdef ENABLE_TRACE
-  char line[1024];
-#endif
   struct netIf userIfs[MAX_IFS];
   bool searchNot = prefixList && prefixList[0] == '^';
   if (searchNot) prefixList++;
@@ -84,7 +81,6 @@ static int findInterfaces(const char* prefixList, char* names, union socketAddre
     if (family != AF_INET && family != AF_INET6)
       continue;
 
-    TRACE(NCCL_INIT|NCCL_NET,"Found interface %s:%s", interface->ifa_name, socketToString(interface->ifa_addr, line));
 
     /* Allow the caller to force the socket family type */
     if (sock_family != -1 && family != sock_family)
@@ -166,9 +162,6 @@ static bool matchSubnet(struct ifaddrs local_if, union socketAddress* remote) {
 }
 
 static int findInterfaceMatchSubnet(char* ifNames, union socketAddress* localAddrs, union socketAddress* remoteAddr, int ifNameMaxSize, int maxIfs) {
-#ifdef ENABLE_TRACE
-  char line[1024];
-#endif
   char line_a[1024];
   int found = 0;
   struct ifaddrs *interfaces, *interface;
@@ -193,7 +186,6 @@ static int findInterfaceMatchSubnet(char* ifNames, union socketAddress* localAdd
     // Store the interface name
     strncpy(ifNames+found*ifNameMaxSize, interface->ifa_name, ifNameMaxSize);
 
-    TRACE(NCCL_INIT|NCCL_NET,"NET : Found interface %s:%s in the same subnet as remote address %s", interface->ifa_name, socketToString(&(localAddrs[found].sa), line), socketToString(&(remoteAddr->sa), line_a));
     found++;
     if (found == maxIfs) break;
   }
@@ -349,11 +341,6 @@ static ncclResult_t createListenSocket(int *fd, union socketAddress *localAddr) 
   socklen_t size = salen;
   SYSCHECK(getsockname(sockfd, &localAddr->sa, &size), "getsockname");
 
-#ifdef ENABLE_TRACE
-  char line[1024];
-  TRACE(NCCL_INIT|NCCL_NET,"Listening on socket %s", socketToString(&localAddr->sa, line));
-#endif
-
   /* Put the socket in listen mode
    * NB: The backlog will be silently truncated to the value in /proc/sys/net/core/somaxconn
    */
@@ -382,10 +369,6 @@ static ncclResult_t connectAddress(int* fd, union socketAddress* remoteAddr) {
     SYSCHECK(setsockopt(*fd, SOL_SOCKET, SO_RCVBUF, (char*)&bufsize, sizeof(int)), "setsockopt");*/
 
   char line[1024];
-#ifdef ENABLE_TRACE
-  TRACE(NCCL_INIT|NCCL_NET,"Connecting to socket %s", socketToString(&remoteAddr->sa, line));
-#endif
-
   int ret;
   int timedout_retries = 0;
   int refused_retries = 0;

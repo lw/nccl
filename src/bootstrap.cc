@@ -172,7 +172,6 @@ static void *bootstrapRoot(void* listenComm) {
   ncclResult_t res;
   setFilesLimit();
 
-  TRACE(NCCL_INIT, "BEGIN");
   /* Receive addresses from all ranks */
   int nranks = 0, c = 0;
   do {
@@ -201,9 +200,8 @@ static void *bootstrapRoot(void* listenComm) {
     memcpy(rankHandles+info.rank, info.extHandleListen, sizeof(ncclNetHandle_t));
 
     ++c;
-    TRACE(NCCL_INIT, "Received connect from rank %d total %d/%d",  info.rank, c, nranks);
+
   } while (c < nranks);
-  TRACE(NCCL_INIT, "COLLECTED ALL %d HANDLES", nranks);
 
   // Send the connect handle for the next rank in the AllGather ring
   for (int r=0; r<nranks; ++r) {
@@ -213,14 +211,12 @@ static void *bootstrapRoot(void* listenComm) {
     NCCLCHECKGOTO(bootstrapNetSend(tmpSendComm, rankHandles+next, sizeof(ncclNetHandle_t)), res, out);
     NCCLCHECKGOTO(bootstrapNetCloseSend(tmpSendComm), res, out);
   }
-  TRACE(NCCL_INIT, "SENT OUT ALL %d HANDLES", nranks);
 
 out:
   bootstrapNetCloseListen(listenComm);
   if (rankHandles) free(rankHandles);
   if (rankHandlesRoot) free(rankHandlesRoot);
 
-  TRACE(NCCL_INIT, "DONE");
   return NULL;
 }
 
@@ -278,7 +274,6 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
   state->nranks = nranks;
   *commState = state;
 
-  TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);
 
   struct extInfo info = { 0 };
   info.rank = rank;
@@ -301,7 +296,7 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
     struct timespec tv;
     tv.tv_sec = msec / 1000;
     tv.tv_nsec = 1000000 * (msec % 1000);
-    TRACE(NCCL_INIT, "rank %d delaying connection to root by %ld msec", rank, msec);
+
     (void) nanosleep(&tv, NULL);
   }
 
@@ -326,7 +321,6 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
   memcpy(state->peerBstrapHandles+rank, info.extHandleListen, sizeof(ncclNetHandle_t));
   NCCLCHECK(bootstrapAllGather(state, state->peerBstrapHandles, sizeof(ncclNetHandle_t)));
 
-  TRACE(NCCL_INIT, "rank %d nranks %d - DONE", rank, nranks);
 
   return ncclSuccess;
 }
@@ -337,7 +331,6 @@ ncclResult_t bootstrapAllGather(void* commState, void* allData, int size) {
   int rank = state->rank;
   int nranks = state->nranks;
 
-  TRACE(NCCL_INIT, "rank %d nranks %d size %d", rank, nranks, size);
 
   /* Simple ring based AllGather
    * At each step i receive data from (rank-i-1) from left
@@ -353,7 +346,6 @@ ncclResult_t bootstrapAllGather(void* commState, void* allData, int size) {
     NCCLCHECK(bootstrapNetRecv(state->extBstrapRingRecvComm, data+rslice*size, size));
   }
 
-  TRACE(NCCL_INIT, "rank %d nranks %d size %d - DONE", rank, nranks, size);
   return ncclSuccess;
 }
 
