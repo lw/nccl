@@ -67,11 +67,6 @@ struct ncclComm {
   int nNodes;
   int localRanks;
 
-  cudaStream_t userStream;
-  bool userStreamSet;
-  cudaEvent_t doneEvent;
-  bool checkPointers;
-
   // Buffer size
   int buffSize;
 

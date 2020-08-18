@@ -7,45 +7,10 @@
 #include "argcheck.h"
 #include "comm.h"
 
-static ncclResult_t CudaPtrCheck(const void* pointer, struct ncclComm* comm, const char* ptrname, const char* opname) {
-  cudaPointerAttributes attr;
-  cudaError_t err = cudaPointerGetAttributes(&attr, pointer);
-  if (err != cudaSuccess || attr.devicePointer == NULL) {
-    WARN("%s : %s is not a valid pointer", opname, ptrname);
-    return ncclInvalidArgument;
-  }
-#if CUDART_VERSION >= 10000
-  if (attr.type == cudaMemoryTypeDevice && attr.device != comm->cudaDev) {
-#else
-  if (attr.memoryType == cudaMemoryTypeDevice && attr.device != comm->cudaDev) {
-#endif
-    WARN("%s : %s allocated on device %d mismatchs with NCCL device %d", opname, ptrname, attr.device, comm->cudaDev);
-    return ncclInvalidArgument;
-  }
-  return ncclSuccess;
-}
-
 ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname) {
   if (ptr == NULL) {
     WARN("%s : %s argument is NULL", opname, ptrname);
     return ncclInvalidArgument;
-  }
-  return ncclSuccess;
-}
-
-ncclResult_t ArgsCheck(struct ncclInfo* info) {
-  // First, the easy ones
-  if (info->root < 0 || info->root >= info->comm->nRanks) {
-    WARN("%s : invalid root %d (root should be in the 0..%d range)", info->opName, info->root, info->comm->nRanks);
-    return ncclInvalidArgument;
-  }
-
-  if (info->comm->checkPointers) {
-    if (strcmp(info->opName, "Send") == 0) {
-      NCCLCHECK(CudaPtrCheck(info->sendbuff, info->comm, "sendbuff", "Send"));
-    } else {
-      NCCLCHECK(CudaPtrCheck(info->recvbuff, info->comm, "recvbuff", "Recv"));
-    }
   }
   return ncclSuccess;
 }

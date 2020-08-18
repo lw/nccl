@@ -38,8 +38,6 @@ const char* ncclAlgoStr[NCCL_NUM_ALGORITHMS] = { "Tree", "Ring" };
 
 NCCL_PARAM(GroupCudaStream, "GROUP_CUDA_STREAM", NCCL_GROUP_CUDA_STREAM);
 
-NCCL_PARAM(CheckPointers, "CHECK_POINTERS", 0);
-
 ncclNet_t* ncclNet = NULL;
 
 // Returns ncclInternalError if anything fails, causing that network to be ignored.
@@ -114,9 +112,6 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   NCCLCHECK(freeChannel(&comm->channel, comm->nRanks));
 
-  if (comm->doneEvent != NULL)
-    CUDACHECK(cudaEventDestroy(comm->doneEvent));
-
   free(comm->myParams);
   CUDACHECK(cudaFreeHost((void *)comm->abortFlag));
 
@@ -137,11 +132,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
     return ncclInvalidArgument;
   }
 
-  // Try to create a CUDA object right away. If there is something wrong with
-  // the device we're on (failure cause #1) , better know it early.
-  cudaEvent_t doneEvent;
-  CUDACHECK(cudaEventCreateWithFlags(&doneEvent, cudaEventDisableTiming));
-
   struct ncclComm* comm;
   NCCLCHECK(ncclCalloc(&comm, 1));
 
@@ -150,8 +140,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   cudaGetDevice(&comm->cudaDev);
   NCCLCHECK(getBusId(comm->cudaDev, &comm->busId));
 
-  comm->doneEvent = doneEvent;
-  comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;
   comm->fatalError = ncclSuccess;
 
   NCCLCHECK(ncclCudaHostCalloc((uint32_t**)&comm->abortFlag, 1));

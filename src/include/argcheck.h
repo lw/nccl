@@ -11,6 +11,5 @@
 #include "info.h"
 
 ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname);
-ncclResult_t ArgsCheck(struct ncclInfo* info);
 
 #endif
