@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
 
     ncclComm_t comm;
 
-    NCCLCHECK(ncclCommInitRank(&comm, world_size, id, rank));
+    NCCLCHECK(ncclCommInitRank(&comm, world_size, id, rank, rank));
 
     ncclTransportP2pSetup(comm, rank ^ 1);
 

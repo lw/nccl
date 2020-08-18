@@ -55,35 +55,10 @@ ncclResult_t initNet(ncclNet_t* net) {
   return ncclSuccess;
 }
 
-ncclResult_t initNetPlugin(ncclNet_t** net) {
-  void* netPluginLib = dlopen("libnccl-net.so", RTLD_NOW | RTLD_LOCAL);
-  if (netPluginLib == NULL) {
-    // dlopen does not guarantee to set errno, but dlerror only gives us a
-    // string, so checking errno doesn't hurt to try to provide a better
-    // error message
-    if (errno == ENOENT) {
-      INFO(NCCL_INIT|NCCL_NET, "NET/Plugin : No plugin found (libnccl-net.so), using internal implementation");
-    } else {
-      INFO(NCCL_INIT|NCCL_NET, "NET/Plugin : Plugin load returned %d : %s.", errno, dlerror());
-    }
-    return ncclSuccess;
-  }
-  ncclNet_t* extNet = (ncclNet_t*) dlsym(netPluginLib, STR(NCCL_PLUGIN_SYMBOL));
-  if (extNet == NULL) {
-    INFO(NCCL_INIT|NCCL_NET, "NET/Plugin: Failed to find " STR(NCCL_PLUGIN_SYMBOL) " symbol.");
-  } else if (initNet(extNet) == ncclSuccess) {
-    *net = extNet;
-    return ncclSuccess;
-  }
-  if (netPluginLib != NULL) dlclose(netPluginLib);
-  return ncclSuccess;
-}
-
 ncclResult_t initNet() {
   // Always initialize bootstrap network
   NCCLCHECK(bootstrapNetInit());
 
-  NCCLCHECK(initNetPlugin(&ncclNet));
   if (ncclNet != NULL) return ncclSuccess;
   if (initNet(&ncclNetIb) == ncclSuccess) {
     ncclNet = &ncclNetIb;
@@ -100,19 +75,11 @@ static ncclResult_t ncclInit() {
   if (initialized) return ncclSuccess;
   pthread_mutex_lock(&initLock);
   if (!initialized) {
-    initEnv();
     NCCLCHECK(initNet());
     INFO(NCCL_INIT, "Using network %s", ncclNetName());
     initialized = true;
   }
   pthread_mutex_unlock(&initLock);
-  return ncclSuccess;
-}
-
-NCCL_API(ncclResult_t, ncclGetVersion, int* version);
-ncclResult_t ncclGetVersion(int* version) {
-  if (version == NULL) return ncclInvalidArgument;
-  *version = NCCL_VERSION_CODE;
   return ncclSuccess;
 }
 
@@ -227,12 +194,6 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
 
   NCCLCHECK(ncclGpuGdrSupport(&info->gdrSupport));
   return ncclSuccess;
-}
-
-void* waitForNonNullPtr(void* p) {
-  volatile void** ptr = (volatile void**) p;
-  while (*ptr == NULL) sched_yield();
-  return (void*)*ptr;
 }
 
 ncclResult_t initParams(struct ncclComm* comm) {
@@ -350,7 +311,8 @@ cleanup:
   return res;
 }
 
-static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
+NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev);
+ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
 
   NCCLCHECKGOTO(ncclInit(), res, end);
@@ -368,14 +330,6 @@ static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUni
   NCCLCHECKGOTO(ncclCommInitRankSync(newcomm, nranks, commId, myrank, cudaDev), res, end);
 end:
   return res;
-}
-
-NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank);
-ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank) {
-  int cudaDev;
-  CUDACHECK(cudaGetDevice(&cudaDev));
-  NCCLCHECK(ncclCommInitRankDev(newcomm, nranks, commId, myrank, cudaDev));
-  return ncclSuccess;
 }
 
 static ncclResult_t commDestroy(ncclComm_t comm) {

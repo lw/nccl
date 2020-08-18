@@ -37,13 +37,6 @@ typedef enum { ncclSuccess                 =  0,
                ncclInvalidUsage            =  5,
                ncclNumResults              =  6 } ncclResult_t;
 
-/* Return the NCCL_VERSION_CODE of the NCCL library in the supplied integer.
- * This integer is coded with the MAJOR, MINOR and PATCH level of the
- * NCCL library
- */
-ncclResult_t  ncclGetVersion(int *version);
-ncclResult_t pncclGetVersion(int *version);
-
 /* Generates an Id to be used in ncclCommInitRank. ncclGetUniqueId should be
  * called once and the Id should be distributed to all ranks in the
  * communicator before calling ncclCommInitRank. */
@@ -56,8 +49,8 @@ ncclResult_t pncclGetUniqueId(ncclUniqueId* uniqueId);
  * ncclCommInitRank.
  * ncclCommInitRank implicitly syncronizes with other ranks, so it must be
  * called by different threads/processes or use . */
-ncclResult_t  ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank);
-ncclResult_t pncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank);
+ncclResult_t  ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank, int cudaDev);
+ncclResult_t pncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank, int cudaDev);
 
 /* Frees resources associated with communicator object, but waits for any operations
  * that might still be running on the device. */
