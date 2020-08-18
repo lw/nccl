@@ -14,36 +14,6 @@
 /* Enqueueing system : computation of kernel and proxy operations parameters */
 /*****************************************************************************/
 
-static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclColl* coll) {
-  coll->args.sendbuff = info->sendbuff;
-  coll->args.recvbuff = info->recvbuff;
-  coll->args.comm = info->comm->devComm;
-
-  coll->args.sendCount = info->sendbytes;
-  coll->args.recvCount = info->recvbytes;
-  coll->args.delta = info->delta;
-  coll->args.nThreads = info->nThreads = info->comm->maxThreads + 2*WARP_SIZE;
-  return ncclSuccess;
-}
-
-ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
-  struct ncclColl coll;
-  NCCLCHECK(computeColl(info, &coll));
-
-  info->comm->myParams->blockDim.x = std::max<unsigned>(info->comm->myParams->blockDim.x, info->nThreads);
-
-  struct ncclChannel* channel = &info->comm->channel;
-
-  info->comm->myParams->gridDim.x = 1;
-  NCCLCHECK(ncclProxySaveP2p(info, channel));
-
-  memcpy(&info->comm->args, &coll, sizeof(struct ncclColl));
-
-  info->comm->myParams->func = (void*)ncclSendRecvKernel_copy_i8;
-
-  return ncclSuccess;
-}
-
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   ncclResult_t ret = ncclSuccess;
   int savedDev = -1;
@@ -57,9 +27,16 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   int nRanks = comm->nRanks;
   int peer = info->root;
 
-  struct ncclInfo info2 = { ncclCollSendRecv, "SendRecv",
-    info->sendbuff, info->recvbuff, info->length, -1, comm, info->stream, /* Args */
-    1, 1 };
+  struct ncclInfo info2 = {
+    /*coll=*/ncclCollSendRecv,
+    /*opName=*/"SendRecv",
+    /*sendbuff=*/info->sendbuff,
+    /*recvbuff=*/info->recvbuff,
+    /*length=*/info->length,
+    /*root=*/-1,
+    /*comm=*/comm,
+    /*stream=*/info->stream
+  };
 
   if (info->recvbuff == NULL) {
     if (peer != rank) {
@@ -75,7 +52,26 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
     info2.recvbytes = info->length;
   }
 
-  NCCLCHECK(ncclSaveKernel(&info2));
+  struct ncclColl coll;
+  coll.args.sendbuff = info2.sendbuff;
+  coll.args.recvbuff = info2.recvbuff;
+  coll.args.comm = comm->devComm;
+
+  coll.args.sendCount = info2.sendbytes;
+  coll.args.recvCount = info2.recvbytes;
+  coll.args.delta = info2.delta;
+  coll.args.nThreads = info2.nThreads = comm->maxThreads + 2*WARP_SIZE;
+
+  comm->myParams->blockDim.x = std::max<unsigned>(comm->myParams->blockDim.x, info2.nThreads);
+
+  struct ncclChannel* channel = &comm->channel;
+
+  comm->myParams->gridDim.x = 1;
+  NCCLCHECK(ncclProxySaveP2p(&info2, channel));
+
+  memcpy(&comm->args, &coll, sizeof(struct ncclColl));
+
+  comm->myParams->func = (void*)ncclSendRecvKernel_copy_i8;
 
   struct cudaLaunchParams* params = comm->myParams;
   params->stream = info->stream;

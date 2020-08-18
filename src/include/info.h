@@ -25,9 +25,6 @@ struct ncclInfo {
   int root;
   ncclComm_t comm;
   cudaStream_t stream;
-  // Algorithm details
-  int chunkSteps;
-  int sliceSteps;
   // Computed later
   int nThreads;
   ssize_t sendbytes;

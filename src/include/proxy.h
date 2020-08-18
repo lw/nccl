@@ -18,8 +18,6 @@ struct ncclProxyArgs {
   proxyProgressFunc_t progress;
   struct ncclChannel* channel;
   struct ncclConnector* connector;
-  int sliceSteps;
-  int chunkSteps;
   int nsteps;
   int state;   // add component before this line -- it is left out during initialization
 

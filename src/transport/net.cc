@@ -190,8 +190,6 @@ ncclResult_t netRecvFree(void* transportResources) {
 ncclResult_t netSendProxy(struct ncclProxyArgs* args) {
   struct netSendResources* resources = (struct netSendResources*) (args->connector->transportResources);
   if (args->state == ncclProxyOpReady) {
-    // Round to next multiple of sliceSteps
-    resources->step = ROUNDUP(resources->step, args->chunkSteps);
     args->head = resources->step;
     args->tail = resources->step;
     args->end = args->head + args->nsteps;
@@ -215,7 +213,7 @@ ncclResult_t netSendProxy(struct ncclProxyArgs* args) {
               sizesFifo[buffSlot] = -1;
               // Make sure size is reset to zero before we update the head.
               __sync_synchronize();
-              args->tail += args->sliceSteps;
+              args->tail += 1;
               args->idle = 0;
             }
           }
@@ -226,7 +224,7 @@ ncclResult_t netSendProxy(struct ncclProxyArgs* args) {
         int buffSlot = args->head%NCCL_STEPS;
         NCCLCHECK(ncclNetTest(args->requests[buffSlot], &done, NULL));
         if (done) {
-          args->head += args->sliceSteps;
+          args->head += 1;
           resources->sendMem->head = args->head;
           args->idle = 0;
         }
@@ -244,8 +242,6 @@ ncclResult_t netSendProxy(struct ncclProxyArgs* args) {
 ncclResult_t netRecvProxy(struct ncclProxyArgs* args) {
   struct netRecvResources* resources = (struct netRecvResources*) (args->connector->transportResources);
   if (args->state == ncclProxyOpReady) {
-    // Round to next multiple of sliceSteps
-    resources->step = ROUNDUP(resources->step, args->chunkSteps);
     args->head = resources->step;
     args->tail = resources->step;
     args->end = args->head + args->nsteps;
@@ -260,10 +256,10 @@ ncclResult_t netRecvProxy(struct ncclProxyArgs* args) {
       volatile uint64_t* sendHead = &resources->sendMem->head;
       if ((args->tail < args->head + NCCL_STEPS) && (args->tail < *sendHead + NCCL_STEPS) && (args->tail < args->end)) {
         int buffSlot = args->tail%NCCL_STEPS;
-        int sliceSize = stepSize * args->sliceSteps;
+        int sliceSize = stepSize;
         NCCLCHECK(ncclNetIrecv(resources->netRecvComm, localBuff+buffSlot*stepSize, sliceSize, mhandle, args->requests+buffSlot));
         if (args->requests[buffSlot] != NULL) {
-          args->tail += args->sliceSteps;
+          args->tail += 1;
           args->idle = 0;
         }
       }
@@ -272,7 +268,7 @@ ncclResult_t netRecvProxy(struct ncclProxyArgs* args) {
         int done, size;
         NCCLCHECK(ncclNetTest(args->requests[buffSlot], &done, &size));
         if (done) {
-          args->head += args->sliceSteps;
+          args->head += 1;
           if (resources->useGdr) NCCLCHECK(ncclNetFlush(resources->netRecvComm, localBuff+buffSlot*stepSize, size, mhandle));
           resources->recvMem->tail = args->head;
           args->idle = 0;
