@@ -81,9 +81,6 @@ struct ncclComm {
   // Whether there has been a fatal error in this communicator.
   ncclResult_t fatalError;
 
-  // Error reported by GPU
-  volatile ncclDevError_t* fatalDevError;
-
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
 

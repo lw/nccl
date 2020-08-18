@@ -94,12 +94,6 @@ struct ncclChannel {
 };
 static_assert(sizeof(struct ncclChannel) == 0x80*sizeof(int), "ncclChannel must have a pow2 size");
 
-typedef enum {
-  ncclDevSuccess,
-  ncclDevAssertedMismatch,
-  ncclDevSuspectedMismatch
-} ncclDevError_t;
-
 struct ncclDevComm {
   int rank;
   int nRanks;
@@ -107,7 +101,6 @@ struct ncclDevComm {
 
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
-  volatile ncclDevError_t *fatalDevError;
 
   // Channels, device side
   struct ncclChannel* channels;

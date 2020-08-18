@@ -225,34 +225,8 @@ ncclResult_t ncclSocketGetNsockNthread(int dev, int* ns, int* nt) {
     nThreads = MAX_THREADS;
   }
   if (nThreads == -2 || nSocksPerThread == -2) {
-    // Auto-detection
-    int autoNt=0, autoNs=1; // By default, we only use the main thread and do not spawn extra threads
-    char vendorPath[PATH_MAX];
-    snprintf(vendorPath, PATH_MAX, "/sys/class/net/%s/device/vendor", ncclSocketDevs[dev].devName);
-    char* rPath = realpath(vendorPath, NULL);
-    int fd = open(rPath, O_RDONLY);
-    free(rPath);
-    if (fd == -1) {
-      // Could not find device vendor. This is handled silently so
-      // we don't want to print an INFO error.
-      TRACE(NCCL_NET, "Open of %s failed : %s\n", vendorPath, strerror(errno));
-      goto end;
-    }
-    char vendor[7];
-    strncpy(vendor, "0x0000", 7);
-    int len;
-    SYSCHECKVAL(read(fd, vendor, 6), "read", len);
-    SYSCHECK(close(fd), "close");
-    if (strcmp(vendor, "0x1d0f") == 0) { // AWS
-      autoNt = 2;
-      autoNs = 8;
-    } else if (strcmp(vendor, "0x1ae0") == 0) { // GCP
-      autoNt = 4;
-      autoNs = 1;
-    }
-end:
-    if (nThreads == -2) nThreads = autoNt;
-    if (nSocksPerThread == -2) nSocksPerThread = autoNs;
+    if (nThreads == -2) nThreads = 0;
+    if (nSocksPerThread == -2) nSocksPerThread = 1;
   }
   int nSocks = nSocksPerThread * nThreads;
   if (nSocks > MAX_SOCKETS) {

@@ -123,7 +123,6 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   free(comm->myParams);
   CUDACHECK(cudaFreeHost((void *)comm->abortFlag));
-  CUDACHECK(cudaFreeHost((void *)comm->fatalDevError));
 
   // Poison comm to try and catch a double free
   commPoison(comm);
@@ -159,10 +158,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   comm->doneEvent = doneEvent;
   comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;
   comm->fatalError = ncclSuccess;
-
-  NCCLCHECK(ncclCudaHostCalloc((ncclDevError_t**)&comm->fatalDevError, 1));
-  comm->hostDevComm.fatalDevError = comm->fatalDevError;
-  *comm->fatalDevError = ncclDevSuccess;
 
   NCCLCHECK(ncclCudaHostCalloc((uint32_t**)&comm->abortFlag, 1));
   comm->hostDevComm.abortFlag = comm->abortFlag;
@@ -402,30 +397,6 @@ ncclResult_t ncclCommGetAsyncError(ncclComm_t comm, ncclResult_t *asyncError) {
   NCCLCHECK(PtrCheck(comm, "ncclGetAsyncError", "comm"));
   NCCLCHECK(PtrCheck(asyncError, "ncclGetAsyncError", "asyncError"));
 
-  // Check device reported error
-  static ncclDevError_t printedDevErr = ncclDevSuccess;
-  switch(*comm->fatalDevError) {
-    case ncclDevSuccess :
-      break;
-    case ncclDevAssertedMismatch :
-      if (printedDevErr != ncclDevAssertedMismatch) {
-        WARN("Mismatched collective detected, please check your collective calls at and around rank %d. You can use NCCL_DEBUG=INFO and NCCL_DEBUG_SUBSYS=COLL to see the collective logs", comm->rank);
-        printedDevErr = ncclDevAssertedMismatch;
-      }
-      if (comm->fatalError == ncclSuccess) {
-        comm->fatalError = ncclInvalidUsage;
-      }
-      break;
-    case ncclDevSuspectedMismatch :
-      if (printedDevErr != ncclDevSuspectedMismatch) {
-        WARN("Your program may be hanging, this may be caused by a collective mismatch around rank %d. Please check your collective calls at and around this rank. You can use NCCL_DEBUG=INFO and NCCL_DEBUG_SUBSYS=COLL to see the collective logs", comm->rank);
-        printedDevErr = ncclDevSuspectedMismatch;
-      }
-      break;
-    default:
-      WARN("Unknown device error %d", *comm->fatalDevError);
-      return ncclInternalError;
-  }
   *asyncError = comm->fatalError;
   return ncclSuccess;
 }
