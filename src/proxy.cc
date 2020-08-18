@@ -8,10 +8,6 @@
 #include "info.h"
 #include "collectives.h"
 
-#define RECV 0
-#define SEND 1
-
-enum { proxyRecv=0, proxySend=1 };
 
 static ncclResult_t allocateArgs(struct ncclComm* comm, struct ncclProxyArgs** argsptr) {
   struct ncclProxyState* state = &comm->proxyState;
@@ -65,19 +61,7 @@ static void ProxyAppend(struct ncclConnector* connector, struct ncclProxyArgs* a
   pthread_mutex_unlock(&state->mutex);
 }
 
-template <int type>
-static ncclResult_t SaveProxy(int peer, struct ncclProxyArgs* args) {
-  if (peer < 0) return ncclSuccess;
-
-  struct ncclPeer* peerComm = args->channel->peers+peer;
-  struct ncclConnector* connector = type == proxyRecv ? &peerComm->recv : &peerComm->send;
-  if (connector->transportComm == NULL) {
-    WARN("[%d] Error no transport for %s peer %d on channel\n", connector->comm->rank,
-        type == proxyRecv ? "recv" : "send", peer);
-    return ncclInternalError;
-  }
-  if (connector->transportComm->proxy == NULL) return ncclSuccess;
-
+ncclResult_t SaveProxy(struct ncclConnector* connector, struct ncclProxyArgs* args) {
   struct ncclProxyArgs* op;
   NCCLCHECK(allocateArgs(connector->comm, &op));
   memcpy(op, args, sizeof(struct ncclProxyArgs));
@@ -85,25 +69,6 @@ static ncclResult_t SaveProxy(int peer, struct ncclProxyArgs* args) {
   op->progress = connector->transportComm->proxy;
   op->state = ncclProxyOpReady;
   ProxyAppend(connector, op);
-  return ncclSuccess;
-}
-
-ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel) {
-  struct ncclProxyArgs args;
-  memset(&args, 0, sizeof(struct ncclProxyArgs));
-  args.channel = channel;
-  if (info->sendbytes >= 0) {
-    int peersend = info->peer;
-    args.nsteps = DIVUP(info->sendbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
-    if (args.nsteps == 0) args.nsteps = 1;
-    NCCLCHECK(SaveProxy<proxySend>(peersend, &args));
-  }
-  if (info->recvbytes >= 0) {
-    int peerrecv = info->peer;
-    args.nsteps = DIVUP(info->recvbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
-    if (args.nsteps == 0) args.nsteps = 1;
-    NCCLCHECK(SaveProxy<proxyRecv>(peerrecv, &args));
-  }
   return ncclSuccess;
 }
 

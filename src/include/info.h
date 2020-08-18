@@ -10,15 +10,4 @@
 #include "nccl.h"
 #include "devcomm.h"
 
-// Used to pass NCCL call information between functions
-struct ncclInfo {
-  const void* sendbuff;
-  void* recvbuff;
-  ssize_t sendbytes;
-  ssize_t recvbytes;
-  int peer;
-  ncclComm_t comm;
-  cudaStream_t stream;
-};
-
 #endif
