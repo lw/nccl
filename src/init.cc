@@ -112,7 +112,6 @@ static ncclResult_t commFree(ncclComm_t comm) {
 
   NCCLCHECK(freeChannel(&comm->channel, comm->nRanks));
 
-  free(comm->myParams);
   CUDACHECK(cudaFreeHost((void *)comm->abortFlag));
 
   // Poison comm to try and catch a double free
@@ -146,8 +145,6 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   comm->hostDevComm.abortFlag = comm->abortFlag;
   *comm->abortFlag = 0;
 
-  comm->argsptr = &comm->args;
-
   *comret = comm;
   return ncclSuccess;
 }
@@ -171,16 +168,6 @@ static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, u
   info->busId = comm->busId;
 
   NCCLCHECK(ncclGpuGdrSupport(&info->gdrSupport));
-  return ncclSuccess;
-}
-
-ncclResult_t initParams(struct ncclComm* comm) {
-  struct cudaLaunchParams* params = comm->myParams;
-  params->args = &comm->argsptr;
-  params->stream = NULL;
-  params->sharedMem = 0;
-  params->blockDim.x = 0; params->blockDim.y = params->blockDim.z = 1;
-  params->gridDim.x = 0; params->gridDim.y = params->gridDim.z = 1;
   return ncclSuccess;
 }
 
@@ -261,9 +248,6 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
 affinity_restore:
   sched_setaffinity(0, sizeof(cpu_set_t), &affinitySave);
   if (ret != ncclSuccess) return ret;
-
-  NCCLCHECK(ncclCalloc(&comm->myParams, 1));
-  NCCLCHECK(initParams(comm));
 
   if (comm->nNodes) NCCLCHECK(ncclProxyCreate(comm));
 

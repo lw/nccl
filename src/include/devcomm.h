@@ -70,7 +70,7 @@ struct CollectiveArgs {
 
   uint16_t nThreads;
   uint16_t unused;
-  int32_t delta;
+  int peer;
   size_t sendCount;
   size_t recvCount;
 };

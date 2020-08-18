@@ -92,14 +92,14 @@ ncclResult_t ncclProxySaveP2p(struct ncclInfo* info, struct ncclChannel* channel
   struct ncclProxyArgs args;
   memset(&args, 0, sizeof(struct ncclProxyArgs));
   args.channel = channel;
-  if (info->delta > 0 && info->sendbytes >= 0) {
-    int peersend = (info->comm->rank + info->delta) % info->comm->nRanks;
+  if (info->sendbytes >= 0) {
+    int peersend = info->peer;
     args.nsteps = DIVUP(info->sendbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
     if (args.nsteps == 0) args.nsteps = 1;
     NCCLCHECK(SaveProxy<proxySend>(peersend, &args));
   }
-  if (info->delta > 0 && info->recvbytes >= 0) {
-    int peerrecv = (info->comm->rank - info->delta + info->comm->nRanks) % info->comm->nRanks;
+  if (info->recvbytes >= 0) {
+    int peerrecv = info->peer;
     args.nsteps = DIVUP(info->recvbytes, info->comm->buffSize/NCCL_STEPS/SENDRECV_SLICEFACTOR);
     if (args.nsteps == 0) args.nsteps = 1;
     NCCLCHECK(SaveProxy<proxyRecv>(peerrecv, &args));

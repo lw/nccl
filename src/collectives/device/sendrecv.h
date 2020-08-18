@@ -18,23 +18,6 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
   const int8_t* sendbuff = (const int8_t*)args->sendbuff;
   int8_t* recvbuff = (int8_t*)args->recvbuff;
 
-  if (args->delta < 0 ) return; // No-op
-
-  if (args->delta == 0) {
-    if (tid < nthreads && sendbuff != recvbuff) {
-      // local copy : ReduceOrCopyMulti takes an int as number of elements,
-      // so we split it in blocks of 1G elements.
-      int blockSize = 1<<30;
-      for (size_t offset=0; offset<args->sendCount; offset += blockSize) {
-        size_t remaining = args->sendCount - offset;
-        if (remaining < blockSize) blockSize = remaining;
-        ReduceOrCopyMulti<COLL_UNROLL, int8_t>(tid, nthreads, sendbuff, recvbuff, blockSize);
-        sendbuff += blockSize; recvbuff += blockSize;
-      }
-    }
-    return;
-  }
-
   struct ncclDevComm* comm = args->comm;
   struct ncclChannel* channel = comm->channels+blockIdx.x;
 
@@ -46,7 +29,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     const ssize_t sendSize = args->sendCount;
     if (sendSize < 0) return;
 
-    int peer = (comm->rank+(int)args->delta)%comm->nRanks;
+    int peer = args->peer;
     SendPrimitive<COLL_UNROLL, int8_t>
       prims(tid, nthreadsSplit, peer, stepSize*4, channel, comm);
 
@@ -64,7 +47,7 @@ __device__ void ncclSendRecvKernel(struct CollectiveArgs* args) {
     const ssize_t recvSize = args->recvCount;
     if (recvSize < 0) return;
 
-    int peer = (comm->rank-(int)args->delta+comm->nRanks)%comm->nRanks;
+    int peer = args->peer;
     RecvPrimitive<COLL_UNROLL, int8_t>
       prims(tid-nthreadsSplit-WARP_SIZE, nthreads-nthreadsSplit, peer, stepSize*4, channel, comm);
 

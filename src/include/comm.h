@@ -84,11 +84,6 @@ struct ncclComm {
   // Host copy of the devComm (to free CUDA allocs)
   struct ncclDevComm hostDevComm;
 
-  // Storage for deferred intra-process launch
-  struct cudaLaunchParams *myParams;
-  struct ncclColl args;
-  void* argsptr;
-
   // Global proxy thread
   pthread_t proxyThread;
   struct ncclProxyState proxyState;

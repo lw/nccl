@@ -10,10 +10,6 @@
 #include "argcheck.h"
 #include "coll_net.h"
 
-/*****************************************************************************/
-/* Enqueueing system : computation of kernel and proxy operations parameters */
-/*****************************************************************************/
-
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   ncclResult_t ret = ncclSuccess;
   int savedDev = -1;
@@ -23,62 +19,29 @@ ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   struct ncclComm* comm = info->comm;
   CUDACHECK(cudaSetDevice(comm->cudaDev));
 
-  int rank = comm->rank;
-  int nRanks = comm->nRanks;
-  int peer = info->root;
-
-  struct ncclInfo info2 = {
-    /*coll=*/ncclCollSendRecv,
-    /*opName=*/"SendRecv",
-    /*sendbuff=*/info->sendbuff,
-    /*recvbuff=*/info->recvbuff,
-    /*length=*/info->length,
-    /*root=*/-1,
-    /*comm=*/comm,
-    /*stream=*/info->stream
-  };
-
-  if (info->recvbuff == NULL) {
-    if (peer != rank) {
-      assert(comm->channel.peers[peer].send.connected);
-    }
-    info2.delta = (peer - rank + nRanks) % nRanks;
-    info2.sendbytes = info->length;
-  } else {
-    if (peer != comm->rank) {
-      assert(comm->channel.peers[peer].recv.connected);
-    }
-    info2.delta = (rank - peer + nRanks) % nRanks;
-    info2.recvbytes = info->length;
-  }
+  struct ncclChannel* channel = &comm->channel;
+  NCCLCHECK(ncclProxySaveP2p(info, channel));
 
   struct ncclColl coll;
-  coll.args.sendbuff = info2.sendbuff;
-  coll.args.recvbuff = info2.recvbuff;
+  // TODO memset to zero?
+  coll.args.sendbuff = info->sendbuff;
+  coll.args.recvbuff = info->recvbuff;
   coll.args.comm = comm->devComm;
+  coll.args.sendCount = info->sendbytes;
+  coll.args.recvCount = info->recvbytes;
+  coll.args.peer = info->peer;
+  coll.args.nThreads = comm->maxThreads + 2 * WARP_SIZE;
 
-  coll.args.sendCount = info2.sendbytes;
-  coll.args.recvCount = info2.recvbytes;
-  coll.args.delta = info2.delta;
-  coll.args.nThreads = info2.nThreads = comm->maxThreads + 2*WARP_SIZE;
+  void* collPtr = &coll;
+  CUDACHECKGOTO(cudaLaunchKernel(
+    /*func=*/(void*)ncclSendRecvKernel_copy_i8,
+    /*gridDim=*/dim3(),
+    /*blockDim=*/dim3(coll.args.nThreads),
+    /*args=*/&collPtr,
+    /*sharedMem=*/0,
+    /*stream=*/info->stream),
+  ret, end);
 
-  comm->myParams->blockDim.x = std::max<unsigned>(comm->myParams->blockDim.x, info2.nThreads);
-
-  struct ncclChannel* channel = &comm->channel;
-
-  comm->myParams->gridDim.x = 1;
-  NCCLCHECK(ncclProxySaveP2p(&info2, channel));
-
-  memcpy(&comm->args, &coll, sizeof(struct ncclColl));
-
-  comm->myParams->func = (void*)ncclSendRecvKernel_copy_i8;
-
-  struct cudaLaunchParams* params = comm->myParams;
-  params->stream = info->stream;
-
-  CUDACHECKGOTO(cudaLaunchKernel(params->func, params->gridDim, params->blockDim, params->args, params->sharedMem, params->stream), ret, end);
-
-  params->gridDim.x = params->blockDim.x = 0;
   NCCLCHECKGOTO(ncclProxyStart(comm), ret, end);
 
 end:
