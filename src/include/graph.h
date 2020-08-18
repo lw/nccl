@@ -53,6 +53,5 @@ ncclResult_t ncclTopoSearchInit(struct ncclTopoSystem* system);
 #define NCCL_TOPO_PATTERN_RING 4            // Ring
 
 ncclResult_t ncclTopoTuneModel(struct ncclComm* comm);
-#include "info.h"
 
 #endif

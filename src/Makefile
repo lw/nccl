@@ -9,11 +9,11 @@ include ../makefiles/version.mk
 
 ##### src files
 INCEXPORTS  := nccl.h nccl_net.h
-LIBSRCFILES := init.cc channel.cc bootstrap.cc transport.cc enqueue.cc debug.cc proxy.cc \
+LIBSRCFILES := init.cc channel.cc bootstrap.cc transport.cc debug.cc proxy.cc \
                 misc/nvmlwrap.cc misc/ibvwrap.cc misc/utils.cc misc/argcheck.cc \
 		        transport/net.cc transport/net_socket.cc transport/net_ib.cc \
                 collectives/sendrecv.cc \
-                graph/topo.cc graph/paths.cc graph/search.cc graph/rings.cc graph/trees.cc graph/tuning.cc graph/xml.cc
+                graph/topo.cc graph/paths.cc graph/search.cc graph/rings.cc graph/tuning.cc graph/xml.cc
 
 ##### lib files
 LIBNAME     := libnccl.so

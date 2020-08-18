@@ -6,9 +6,11 @@
 
 #include <cassert>
 
-#include "enqueue.h"
 #include "collectives.h"
+#include "comm.h"
 #include "argcheck.h" // Need some checks here since we access comm
+
+extern void ncclSendRecvKernel_copy_i8(struct ncclColl c);
 
 NCCL_API(ncclResult_t, ncclSend, const void* sendbuff, size_t count, int peer,
     ncclComm_t comm, cudaStream_t stream);

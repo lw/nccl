@@ -7,7 +7,7 @@
 #ifndef NCCL_COLLECTIVES_H_
 #define NCCL_COLLECTIVES_H_
 
-extern __global__ void ncclSendRecvKernel_copy_i8(struct ncclColl c);
+// extern __global__ void ncclSendRecvKernel_copy_i8(struct ncclColl c);
 
 // CHUNKSIZE must be a multiple of SLICESIZE
 #define SENDRECV_SLICEFACTOR 4

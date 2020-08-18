@@ -7,7 +7,6 @@
 #include <cassert>
 
 #include "comm.h"
-#include "info.h"
 #include "bootstrap.h"
 
 extern struct ncclTransport netTransport;

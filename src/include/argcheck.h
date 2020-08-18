@@ -8,7 +8,6 @@
 #define NCCL_ARGCHECK_H_
 
 #include "core.h"
-#include "info.h"
 
 ncclResult_t PtrCheck(void* ptr, const char* opname, const char* ptrname);
 

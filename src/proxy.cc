@@ -5,7 +5,6 @@
  ************************************************************************/
 
 #include "comm.h"
-#include "info.h"
 #include "collectives.h"
 
 

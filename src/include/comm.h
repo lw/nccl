@@ -8,25 +8,9 @@
 #define NCCL_COMM_H_
 
 #include "transport.h"
-#include "p2p.h"
-
-#if CUDART_VERSION < 9000
-struct cudaLaunchParams {
-  void *func;
-  dim3 gridDim;
-  dim3 blockDim;
-  void **args;
-  size_t sharedMem;
-  cudaStream_t stream;
-};
-#endif
 
 #define CACHE_LINE_SIZE 128
 #define MEM_ALIGN 4096
-#define CUDA_IPC_MIN 2097152UL
-
-// Channels / LL tuning
-#define NCCL_SIMPLE_THREAD_THRESHOLD 64
 
 struct ncclSendMem {
   union {
